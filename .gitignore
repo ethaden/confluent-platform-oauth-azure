@@ -1,0 +1,5 @@
+keypair
+.env
+keypair/*
+bin
+mount
