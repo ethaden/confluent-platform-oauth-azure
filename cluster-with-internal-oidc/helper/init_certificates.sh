@@ -62,3 +62,4 @@ EOF
 echo "Creating client files"
 create_kafka_oauthbearer_config /mount/superuser.properties "$IDP_TOKEN_ENDPOINT" "$SUPERUSER_CLIENT_ID" "$SUPERUSER_CLIENT_SECRET" "$AZURE_OAUTH_SCOPE"
 create_kafka_oauthbearer_config /mount/client.properties "$IDP_TOKEN_ENDPOINT" "$CLIENT_APP_ID" "$CLIENT_APP_SECRET" "$AZURE_OAUTH_SCOPE"
+exit 0
