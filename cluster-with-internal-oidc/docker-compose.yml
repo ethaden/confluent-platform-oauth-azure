@@ -15,7 +15,7 @@ services:
       restart_policy: 
         condition: none
 
-  broker:
+  broker1:
     image: ${DOCKER_REGISTRY}confluentinc/cp-server:${CONFLUENT_DOCKER_TAG:-latest}
     hostname: broker
     container_name: broker
@@ -23,24 +23,22 @@ services:
       init_certificates:
         condition: service_completed_successfully
     healthcheck:
-      test: curl -fail --silent --insecure http://broker:8091/v1/metadata/id || exit 1
+      test: curl -fail --silent --insecure http://broker1:8091/v1/metadata/id || exit 1
       interval: 10s
       retries: 5
       start_period: 20s
     ports:
-      - "9092:9092"
-      - "9101:9101"
-      - "9095:9095"
-      - "8091:8091"
-      - "1234:1234"
+      - "19092:9092"
+      - "19095:19095"
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:SASL_PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://broker:29092,CONTROLLER://broker:29093,PLAINTEXT_HOST://0.0.0.0:9092,INTERNAL://broker:9093,EXTERNAL://broker:9095
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://broker:9092,INTERNAL://broker:9093,EXTERNAL://broker:9095
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:SASL_PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,INTERNAL:SASL_PLAINTEXT,EXTERNALOAUTH:SASL_PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://broker1:9092,CONTROLLER://broker1:9192,PLAINTEXT_HOST://0.0.0.0:19092,INTERNAL://broker1:9093,EXTERNALOAUTH://broker1:19095
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker1:9092,PLAINTEXT_HOST://localhost:9092,INTERNAL://broker1:9093,EXTERNALOAUTH://broker1:19095
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@broker:29093'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@broker1:9192'
+      #,2@broker2:9192,3@broker3:9192'
       KAFKA_SASL_MECHANISM_CONTROLLER_PROTOCOL: PLAIN
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
       CLUSTER_ID: 'vHCgQyIrRHG8Jv27qI2h3Q'
@@ -69,19 +67,20 @@ services:
         user_mds="mds-secret";
 
       # Configure OAuth Token listener
-      KAFKA_LISTENER_NAME_EXTERNAL_SASL_ENABLED_MECHANISMS: OAUTHBEARER
-      KAFKA_LISTENER_NAME_EXTERNAL_SASL_OAUTHBEARER_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT}
-      KAFKA_LISTENER_NAME_EXTERNAL_SASL_OAUTHBEARER_EXPECTED_AUDIENCE: $EXPECTED_AUDIENCE
-      KAFKA_LISTENER_NAME_EXTERNAL_SASL_OAUTHBEARER_SUB_CLAIM_NAME: $SUB_CLAIM_NAME
+      KAFKA_LISTENER_NAME_EXTERNALOAUTH_SASL_ENABLED_MECHANISMS: OAUTHBEARER
+      KAFKA_LISTENER_NAME_EXTERNALOAUTH_SASL_OAUTHBEARER_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT}
+      KAFKA_LISTENER_NAME_EXTERNALOAUTH_SASL_OAUTHBEARER_EXPECTED_AUDIENCE: $EXPECTED_AUDIENCE
+      KAFKA_LISTENER_NAME_EXTERNALOAUTH_SASL_OAUTHBEARER_SUB_CLAIM_NAME: $SUB_CLAIM_NAME
       # unsecuredLoginStringClaim_sub="thePrincipalName" is just a workaround for some OSS-specific issues. It needs to be configured but will be ignored. The value needs to be as it is.
-      KAFKA_LISTENER_NAME_EXTERNAL_OAUTHBEARER_SASL_JAAS_CONFIG: |
+      # DOUBLE CHECK!
+      KAFKA_LISTENER_NAME_EXTERNALOAUTH_OAUTHBEARER_SASL_JAAS_CONFIG: |
         org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
         unsecuredLoginStringClaim_sub="thePrincipalName" \
         publicKeyPath="/tmp/conf/public.pem" \
         scope="$AZURE_OAUTH_SCOPE";
 
-      KAFKA_LISTENER_NAME_EXTERNAL_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.confluent.kafka.server.plugins.auth.token.CompositeBearerValidatorCallbackHandler
-      KAFKA_LISTENER_NAME_EXTERNAL_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
+      KAFKA_LISTENER_NAME_EXTERNALOAUTH_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.confluent.kafka.server.plugins.auth.token.CompositeBearerValidatorCallbackHandler
+      KAFKA_LISTENER_NAME_EXTERNA_OAUTHL_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
       KAFKA_LISTENER_NAME_CONTROLLER_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
       KAFKA_CONFLUENT_OAUTH_GROUPS_CLAIM_NAME: $GROUP_CLAIM_NAME
 
@@ -93,7 +92,7 @@ services:
       KAFKA_CONFLUENT_METADATA_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONFLUENT_METADATA_SERVER_AUTHENTICATION_METHOD: BEARER
       KAFKA_CONFLUENT_METADATA_SERVER_LISTENERS: http://0.0.0.0:8091
-      KAFKA_CONFLUENT_METADATA_SERVER_ADVERTISED_LISTENERS: http://broker:8091
+      KAFKA_CONFLUENT_METADATA_SERVER_ADVERTISED_LISTENERS: http://broker1:8091
       KAFKA_CONFLUENT_METADATA_SERVER_TOKEN_KEY_PATH: /tmp/conf/keypair.pem
       KAFKA_CONFLUENT_METADATA_SERVER_OPENAPI_ENABLE: 'true'
       # Use MDS without LDAP, OAuth token is required
@@ -109,13 +108,23 @@ services:
       # DOES NOT EXIST:
       #KAFKA_CONFLUENT_METADATA_SERVER_OAUTHBEARER_LOGIN_OAUTH_SCOPE: ${AZURE_OAUTH_SCOPE}
 
-      # EmbeddedKafkaRest: Kafka Client Configuration
-      KAFKA_KAFKA_REST_BOOTSTRAP_SERVERS: SASL_PLAINTEXT://broker:9095
-      KAFKA_KAFKA_REST_CLIENT_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      # EmbeddedKafkaRest: Kafka Client Configuration (ONLY REQUIRED FOR STANDALONE REST PROXY)
+      KAFKA_KAFKA_CLIENT_BOOTSTRAP_SERVERS: SASL_PLAINTEXT://broker1:9095
+      KAFKA_CLIENT_SASL_MECHANISM: OAUTHBEARER
+      KAFKA_CLIENT_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      KAFKA_CLIENT_SASL_LOGIN_CALLBACK_HANDLER_CLASS: 'org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler'
+      KAFKA_CLIENT_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: $IDP_TOKEN_ENDPOINT
+      KAFKA_CLIENT_SASL_JAAS_CONFIG: |
+        org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+        clientId="$AZURE_CP_APPLICATION_ID" \
+        clientSecret="$AZURE_CP_APPLICATION_SECRET" \
+        scope="$AZURE_OAUTH_SCOPE";
 
       # EmbeddedKafkaRest: HTTP Auth Configuration
+      KAFKA_KAFKA_REST_BOOTSTRAP_SERVERS: EXTERNALOAUTH://broker1:19095
       KAFKA_KAFKA_REST_KAFKA_REST_RESOURCE_EXTENSION_CLASS: io.confluent.kafkarest.security.KafkaRestSecurityResourceExtension
-      KAFKA_KAFKA_REST_REST_SERVLET_INITIALIZOR_CLASSES: io.confluent.common.security.jetty.initializer.AuthenticationHandler
+      # See https://docs.confluent.io/platform/current/security/authentication/multi-protocol/authenticationhandler.html
+      KAFKA_KAFKA_REST_SERVLET_INITIALIZOR_CLASSES: io.confluent.common.security.jetty.initializer.AuthenticationHandler
       KAFKA_KAFKA_REST_AUTHENTICATION_ROLES: "**"
       KAFKA_KAFKA_REST_OAUTHBEARER_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT}
       KAFKA_KAFKA_REST_OAUTHBEARER_EXPECTED_ISSUER: ${IDP_EXPECTED_ISSUER}
@@ -125,7 +134,7 @@ services:
       KAFKA_KAFKA_REST_PUBLIC_KEY_PATH: /tmp/conf/public.pem
 
       # EmbeddedKafkaRest: MDS Client configuration
-      KAFKA_KAFKA_REST_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker:8091
+      KAFKA_KAFKA_REST_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: OAUTHBEARER
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CLIENT_ID: ${RP_CLIENT_ID}
@@ -155,6 +164,7 @@ services:
       KAFKA_CONFLUENT_REPORTERS_TELEMETRY_AUTO_ENABLED: 'false'
       KAFKA_LOG_RETENTION_HOURS: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLED: 'true'
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
@@ -193,7 +203,7 @@ services:
     image: ${DOCKER_REGISTRY}confluentinc/cp-server:${CONFLUENT_DOCKER_TAG:-latest}
     container_name: init_permissions
     depends_on:
-      broker:
+      broker1:
         condition: service_healthy
     volumes:
       - ./helper/init_permissions.sh:/usr/bin/init_permissions.sh
@@ -222,7 +232,7 @@ services:
     hostname: schema-registry
     container_name: schema-registry
     depends_on:
-      broker:
+      broker1:
         condition: service_healthy
       init_permissions:
         condition: service_completed_successfully
@@ -240,7 +250,7 @@ services:
       EXTRA_ARGS: "-javaagent:/usr/bin/jmx/jmx_prometheus_javaagent-0.15.0.jar=1235:/usr/bin/jmx/exporter.yml"
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker:9095'
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker1:9095'
       SCHEMA_REGISTRY_GROUP_ID: schema-registry-demo
       KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
       SCHEMA_REGISTRY_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=*'
@@ -250,9 +260,10 @@ services:
       SCHEMA_REGISTRY_KAFKASTORE_SASL_LOGIN_CALLBACK_HANDLER_CLASS: 'org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler'
       SCHEMA_REGISTRY_KAFKASTORE_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: $IDP_TOKEN_ENDPOINT
       SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG: |
-              org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
-              clientId="$SR_CLIENT_ID" \
-              clientSecret="$SR_CLIENT_SECRET";
+        org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+        clientId="$SR_CLIENT_ID" \
+        clientSecret="$SR_CLIENT_SECRET" \
+        scope="$AZURE_OAUTH_SCOPE";
 
       #Enable Schema Linking handler
       SCHEMA_REGISTRY_KAFKASTORE_UPDATE_HANDLERS: 'io.confluent.schema.exporter.storage.SchemaExporterUpdateHandler'
@@ -275,7 +286,7 @@ services:
       SCHEMA_REGISTRY_REST_AUTH_JMX_ENABLED: 'true'
 
       # For connecting to MDS
-      SCHEMA_REGISTRY_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker:8091
+      SCHEMA_REGISTRY_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
       SCHEMA_REGISTRY_CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: OAUTHBEARER
       SCHEMA_REGISTRY_CONFLUENT_METADATA_OAUTHBEARER_TOKEN_ENDPOINT_URL: $IDP_TOKEN_ENDPOINT
       SCHEMA_REGISTRY_CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CLIENT_ID: $SR_CLIENT_ID
@@ -295,7 +306,7 @@ services:
     #   retries: 20
     #   test: curl --user connectAdmin:connectAdmin --fail --silent --insecure https://connect:8083/ --output /dev/null || exit 1
     depends_on:
-      broker:
+      broker1:
         condition: service_healthy
       init_permissions:
         condition: service_completed_successfully
@@ -311,7 +322,7 @@ services:
     environment:
       CUB_CLASSPATH: '/usr/share/java/confluent-security/connect/*:/usr/share/java/kafka/*:/usr/share/java/cp-base-new/*:/usr/share/java/confluent-secret-registry/*'
       EXTRA_ARGS: "-javaagent:/usr/bin/jmx/jmx_prometheus_javaagent-0.15.0.jar=1236:/usr/bin/jmx/exporter.yml"
-      CONNECT_BOOTSTRAP_SERVERS: broker:9095
+      CONNECT_BOOTSTRAP_SERVERS: broker1:9095
       CONNECT_LISTENERS: http://0.0.0.0:8083
       CONNECT_GROUP_ID: "connect-cluster"
       CONNECT_PRODUCER_CLIENT_ID: "connect-worker-producer"
@@ -352,9 +363,10 @@ services:
       CONNECT_SASL_LOGIN_CALLBACK_HANDLER_CLASS: 'org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler'
       CONNECT_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: $IDP_TOKEN_ENDPOINT
       CONNECT_SASL_JAAS_CONFIG: |
-              org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
-              clientId="$CONNECT_CLIENT_ID" \
-              clientSecret="$CONNECT_CLIENT_SECRET";
+        org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+        clientId="$CONNECT_CLIENT_ID" \
+        clientSecret="$CONNECT_CLIENT_SECRET" \
+        scope="$AZURE_OAUTH_SCOPE";
 
       # Allow overriding configs on the connector level
       CONNECT_CONNECTOR_CLIENT_CONFIG_OVERRIDE_POLICY: 'All'
@@ -378,9 +390,10 @@ services:
       CONNECT_CONSUMER_CONFLUENT_MONITORING_INTERCEPTOR_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: $IDP_TOKEN_ENDPOINT
 
       CONNECT_CONSUMER_CONFLUENT_MONITORING_INTERCEPTOR_SASL_JAAS_CONFIG: |
-              org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
-              clientId="$CONNECT_CLIENT_ID" \
-              clientSecret="$CONNECT_CLIENT_SECRET";
+        org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+        clientId="$CONNECT_CLIENT_ID" \
+        clientSecret="$CONNECT_CLIENT_SECRET" \
+        scope="$AZURE_OAUTH_SCOPE";
 
       # Default admin config
       CONNECT_ADMIN_SECURITY_PROTOCOL: SASL_PLAINTEXT
@@ -388,9 +401,10 @@ services:
       CONNECT_ADMIN_SASL_LOGIN_CALLBACK_HANDLER_CLASS: 'org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler'
       CONNECT_ADMIN_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: $IDP_TOKEN_ENDPOINT
       CONNECT_ADMIN_SASL_JAAS_CONFIG: |
-              org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
-              clientId="$CONNECT_CLIENT_ID" \
-              clientSecret="$CONNECT_CLIENT_SECRET";
+        org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+        clientId="$CONNECT_CLIENT_ID" \
+        clientSecret="$CONNECT_CLIENT_SECRET" \
+        scope="$AZURE_OAUTH_SCOPE";
 
       CONNECT_ADMIN_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.connect.truststore.jks
       CONNECT_ADMIN_SSL_TRUSTSTORE_PASSWORD: confluent
@@ -411,7 +425,7 @@ services:
       CONNECT_OAUTHBEARER_GROUPS_CLAIM_NAME: $GROUP_CLAIM_NAME
 
        # For connecting to MDS
-      CONNECT_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker:8091
+      CONNECT_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
       CONNECT_CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: OAUTHBEARER
       CONNECT_CONFLUENT_METADATA_OAUTHBEARER_TOKEN_ENDPOINT_URL: $IDP_TOKEN_ENDPOINT
       CONNECT_CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CLIENT_ID: $CONNECT_CLIENT_ID
@@ -425,7 +439,7 @@ services:
       CONNECT_CONFIG_PROVIDERS: 'secret'
       CONNECT_CONFIG_PROVIDERS_SECRET_CLASS: 'io.confluent.connect.secretregistry.rbac.config.provider.InternalSecretConfigProvider'
       CONNECT_CONFIG_PROVIDERS_SECRET_PARAM_MASTER_ENCRYPTION_KEY: 'password1234'
-      CONNECT_CONFIG_PROVIDERS_SECRET_PARAM_KAFKASTORE_BOOTSTRAP_SERVERS: broker:9095
+      CONNECT_CONFIG_PROVIDERS_SECRET_PARAM_KAFKASTORE_BOOTSTRAP_SERVERS: broker1:9095
       CONNECT_CONFIG_PROVIDERS_SECRET_PARAM_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
       CONNECT_CONFIG_PROVIDERS_SECRET_PARAM_KAFKASTORE_SECURITY_PROTOCOL: SASL_PLAINTEXT
       CONNECT_CONFIG_PROVIDERS_SECRET_PARAM_KAFKASTORE_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.connect.truststore.jks
@@ -437,9 +451,10 @@ services:
       CONNECT_CONFIG_PROVIDERS_SECRET_PARAM_KAFKASTORE_SASL_LOGIN_CALLBACK_HANDLER_CLASS: 'org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler'
       CONNECT_CONFIG_PROVIDERS_SECRET_PARAM_KAFKASTORE_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: $IDP_TOKEN_ENDPOINT
       CONNECT_CONFIG_PROVIDERS_SECRET_PARAM_KAFKASTORE_SASL_JAAS_CONFIG: |
-             org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
-             clientId="$CONNECT_CLIENT_ID" \
-             clientSecret="$CONNECT_CLIENT_SECRET";
+        org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+        clientId="$CONNECT_CLIENT_ID" \
+        clientSecret="$CONNECT_CLIENT_SECRET" \
+        scope="$AZURE_OAUTH_SCOPE";
 
 #      CONNECT_SSL_CIPHER_SUITES: ${SSL_CIPHER_SUITES}
 
@@ -454,7 +469,7 @@ services:
     hostname: ksqldb-server
     container_name: ksqldb-server
     depends_on:
-      broker:
+      broker1:
         condition: service_healthy
       init_permissions:
         condition: service_completed_successfully
@@ -483,7 +498,7 @@ services:
 
       KSQL_PRODUCER_ENABLE_IDEMPOTENCE: 'true'
 
-      KSQL_BOOTSTRAP_SERVERS: broker:9095
+      KSQL_BOOTSTRAP_SERVERS: broker1:9095
       KSQL_HOST_NAME: ksqldb-server
       KSQL_LISTENERS: "http://0.0.0.0:8088"
       KSQL_CACHE_MAX_BYTES_BUFFERING: 0
@@ -501,7 +516,7 @@ services:
       KSQL_OAUTHBEARER_GROUPS_CLAIM_NAME: $GROUP_CLAIM_NAME
 
       # Used by ksqlDB's REST layer to connect to MDS to verify tokens and authenticate clients
-      KSQL_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker:8091
+      KSQL_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
       KSQL_CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: 'OAUTHBEARER'
       KSQL_CONFLUENT_METADATA_OAUTHBEARER_TOKEN_ENDPOINT_URL: $IDP_TOKEN_ENDPOINT
       KSQL_CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CLIENT_ID: $KSQL_CLIENT_ID
@@ -526,7 +541,8 @@ services:
       KSQL_SASL_JAAS_CONFIG: |
         org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
         clientId="$KSQL_CLIENT_ID" \
-        clientSecret="$KSQL_CLIENT_SECRET";   
+        clientSecret="$KSQL_CLIENT_SECRET" \
+        scope="$AZURE_OAUTH_SCOPE";   
 
       # Confluent Monitoring Interceptors for Control Center streams monitoring
       KSQL_PRODUCER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor"
@@ -537,8 +553,9 @@ services:
       KSQL_CONFLUENT_MONITORING_INTERCEPTOR_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: $IDP_TOKEN_ENDPOINT
       KSQL_CONFLUENT_MONITORING_INTERCEPTOR_SASL_JAAS_CONFIG: |
         org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
-              clientId="$KSQL_CLIENT_ID" \
-              clientSecret="$KSQL_CLIENT_SECRET";
+        clientId="$KSQL_CLIENT_ID" \
+        clientSecret="$KSQL_CLIENT_SECRET" \
+        scope="$AZURE_OAUTH_SCOPE";
 
   c3prometheus:
     image: confluentinc/cp-enterprise-prometheus:2.2.0
@@ -580,7 +597,7 @@ services:
         condition: service_started
       c3_alertmanager:
         condition: service_started
-      broker:
+      broker1:
         condition: service_healthy
       init_permissions:
         condition: service_completed_successfully
@@ -607,7 +624,7 @@ services:
       # Also c3prometheus and alertmanager and it's respective settings
 
       # general settings
-      CONTROL_CENTER_BOOTSTRAP_SERVERS: EXTERNAL://broker:9095
+      CONTROL_CENTER_BOOTSTRAP_SERVERS: EXTERNALOAUTH://broker1:9095
       CONTROL_CENTER_REPLICATION_FACTOR: 1
       CONTROL_CENTER_INTERNAL_TOPICS_PARTITIONS: 1
       CONTROL_CENTER_LOG4J_ROOT_LOGLEVEL: INFO
@@ -620,9 +637,10 @@ services:
       CONTROL_CENTER_STREAMS_SASL_LOGIN_CALLBACK_HANDLER_CLASS: org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler
       CONTROL_CENTER_STREAMS_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: $IDP_TOKEN_ENDPOINT
       CONTROL_CENTER_STREAMS_SASL_JAAS_CONFIG: |
-              org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
-              clientId="$C3_CLIENT_ID" \
-              clientSecret="$C3_CLIENT_SECRET";
+        org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+        clientId="$C3_CLIENT_ID" \
+        clientSecret="$C3_CLIENT_SECRET" \
+        scope="$AZURE_OAUTH_SCOPE";
 
 
       CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_REPLICATION: 1
@@ -632,7 +650,8 @@ services:
       CONTROL_CENTER_MONITORING_INTERCEPTOR_SASL_JASS_CONFIG: |
         org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
         clientId="$C3_CLIENT_ID" \
-        clientSecret="$C3_CLIENT_SECRET";
+        clientSecret="$C3_CLIENT_SECRET" \
+        scope="$AZURE_OAUTH_SCOPE";
 
       CONTROL_CENTER_METRICS_TOPIC_REPLICATION: 1
       CONTROL_CENTER_METRICS_TOPIC_PARTITIONS: 1
@@ -663,7 +682,7 @@ services:
 
 
       # Used by Control Center to connect to MDS to verify tokens and authenticate clients
-      CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker:8091
+      CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
       CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: OAUTHBEARER
       CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CREDENTIALS_SOURCE: OAUTHBEARER
       CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CLIENT_ID: $C3_CLIENT_ID
@@ -689,7 +708,7 @@ services:
     hostname: prometheus
     container_name: prometheus
     depends_on:
-      broker:
+      broker1:
         condition: service_healthy
     ports:
       - "9990:9990"
@@ -702,7 +721,7 @@ services:
     hostname: grafana
     container_name: grafana
     depends_on:
-      broker:
+      broker1:
         condition: service_healthy
     environment:
       - GF_SECURITY_ADMIN_USER=admin
