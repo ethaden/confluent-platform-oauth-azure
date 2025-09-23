@@ -6,18 +6,16 @@ if [ \! -f "${DIR}/.env" ]; then
   echo "Error: .env file not found in ${DIR}. Please create it based on the .env-example file."
   exit 1
 fi
-echo "Processing .env"
-source .env
-source ${DIR}/helper/cp_config.sh
-source ${DIR}/helper/functions.sh
+#echo "Processing .env"
+#source .env
+#source ${DIR}/helper/cp_config.sh
+#source ${DIR}/helper/functions.sh
 
 #-------------------------------------------------------------------------------
 # Update cli permission to be executable
-update_cli_permissions
+#update_cli_permissions
 
 # Create client files to be used for produce/consume
-create_client_files
-
-create_env_file
+#create_client_files
 
 docker compose up -d
