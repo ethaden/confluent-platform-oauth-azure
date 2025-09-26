@@ -38,12 +38,12 @@ services:
     ports:
       - "9092:9092" # KAFKA PLAINTEXT
       - "8091:8091" # MDS
-      - "19095:19095" # KAFKA with OAUTHBEARER
+      - "9095:9095" # KAFKA with OAUTHBEARER
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:SASL_PLAINTEXT,INTERNAL:SASL_PLAINTEXT,EXTERNALOAUTH:SASL_PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://broker1:9092,CONTROLLER://broker1:9192,INTERNAL://broker1:9093,EXTERNALOAUTH://broker1:19095
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker1:9092,INTERNAL://broker1:9093,EXTERNALOAUTH://broker1:19095
+      KAFKA_LISTENERS: PLAINTEXT://broker1:9092,CONTROLLER://broker1:9192,INTERNAL://broker1:9093,EXTERNALOAUTH://broker1:9095
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker1:9092,INTERNAL://broker1:9093,EXTERNALOAUTH://broker1:9095
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_PROCESS_ROLES: 'broker,controller'
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@broker1:9192'
@@ -138,7 +138,7 @@ services:
         scope="$AZURE_OAUTH_SCOPE";
 
       # EmbeddedKafkaRest: HTTP Auth Configuration
-      KAFKA_KAFKA_REST_BOOTSTRAP_SERVERS: EXTERNALOAUTH://broker1:19095
+      KAFKA_KAFKA_REST_BOOTSTRAP_SERVERS: EXTERNALOAUTH://broker1:9095
       KAFKA_KAFKA_REST_KAFKA_REST_RESOURCE_EXTENSION_CLASS: io.confluent.kafkarest.security.KafkaRestSecurityResourceExtension
       # See https://docs.confluent.io/platform/current/security/authentication/multi-protocol/authenticationhandler.html
       KAFKA_KAFKA_REST_SERVLET_INITIALIZOR_CLASSES: io.confluent.common.security.jetty.initializer.AuthenticationHandler

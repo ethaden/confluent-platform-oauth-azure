@@ -33,6 +33,11 @@ Update the manifest of the app registration and make sure that the version is se
 "requestedAccessTokenVersion": 2,
 ```
 
+You can easily check if this setting has been configured properly by acquiring a token for your app registration and theck the `ver`claim in the token. It should be `2.0`.
+The isuer (field: `iss`) should start with `https://login.microsoftonline.com`.
+
+For Version 1, the issuer would start with with `https://sts.windows.net` and the setup wouldn't work.
+ 
 ==== Optionally: Create App Roles
 One way to authorize users for specific resources in Confluent Cloud is to configure App Roles in Azure.
 Just add roles to your app registration, for example a role called `OrgAdminRole`, and configure it such that both users/groups and applications may get access to it.
@@ -84,7 +89,6 @@ sudo vi /etc/hosts
 Add these lines at the end of the file:
 
 ```shell
-127.0.0.1       keycloak
 127.0.0.1       broker
 127.0.0.1       schema-registry
 127.0.0.1       connect
@@ -95,7 +99,6 @@ Add these lines at the end of the file:
 If you are using IPv6, you might need to add these additional lines:
 
 ```shell
-::1       keycloak
 ::1       broker
 ::1       schema-registry
 ::1       connect
@@ -105,9 +108,12 @@ If you are using IPv6, you might need to add these additional lines:
 
 Save the file and close it.
 
+=== Customize the docker compose environment
+Go the the `cluster...` folder, copy the `.env-template` to `.env` and customize it.
+
 === Start the environment
 
-To initialise the environment, use the provided start script:
+To initialise the environment, you can either call `docker compose up -d` or use the provided start script:
 
 ```shell
 ./start.sh
@@ -115,15 +121,12 @@ To initialise the environment, use the provided start script:
 
 This will:
 
-1. Start a Keycloak server on port 8080. This acts as the OAuth identity provider.
-2. Run Confluent Server with Role-based access control (RBAC).
-3. Create a new listener `EXTERNAL` for SASL/OAuthBearer in Confluent Server.
-4. Configure Confluent Server to connect to local Keycloak identity provider.
-5. Configure Schema Registry, Connect, ksqlDB and Control Center to authenticate via OAuth.
-6. Datagen source connector plugin is added in Connect.
-7. Configure Control Center to talk to MDS, Schema Registry, ksqlDB and Connect.
-8. Configure Prometheus and Grafana for metrics visualization
-9. Adds some access tokens to environment variable. These will be valid for 1 hour, after which the token access commands need to be run again.
+* Run Confluent Server with Role-based access control (RBAC).
+* Configure Schema Registry, Connect, ksqlDB and Control Center to authenticate via OAuth.
+* Datagen source connector plugin is added in Connect.
+* Configure Control Center to talk to MDS, Schema Registry, ksqlDB and Connect.
+* Configure Prometheus and Grafana for metrics visualization
+* Adds some access tokens to environment variable. These will be valid for 1 hour, after which the token access commands need to be run again.
 
 If you need access tokens for the vaious service users for testing, please have a look at the `helper/set_user_tokens.sh`. It will acquire tokens for you. Just source it:
 
@@ -134,16 +137,42 @@ source helper/set_user_tokens.sh
 === Produce and Consume to Kafka using OAuth from Broker
 
 ```shell
-   docker compose exec broker kafka-console-producer \
-     --bootstrap-server broker:9095 \
-     --topic test \
-     --producer.config /etc/confluent/configs/client.properties
-   
-   docker compose exec broker kafka-console-consumer \
-     --bootstrap-server broker:9095 \
-     --topic test \
-     --consumer.config /etc/confluent/configs/client.properties
-   ```
+docker compose exec broker1 kafka-console-producer \
+    --bootstrap-server broker1:9095 \
+    --topic test \
+    --producer.config /etc/confluent/configs/client.properties
+
+docker compose exec broker1 kafka-console-consumer \
+    --bootstrap-server broker1:9095 \
+    --from-beginning \
+    --topic test \
+    --consumer.config /etc/confluent/configs/client.properties
+```
+
+=== Creating a new topic
+
+Let's try to create a new topic as user `client`. 
+
+```shell
+docker compose exec broker1 kafka-topics \
+    --bootstrap-server broker1:9095 \
+    --topic test123 \
+    --command.config /etc/confluent/configs/client.properties
+```
+
+This should work as there is an RBAC role granting ResourceOwner to all topics starting with `test` to the `client` user.
+
+Try to create another topic:
+
+```shell
+docker compose exec broker1 kafka-topics \
+    --bootstrap-server broker1:9095 \
+    --topic abcde \
+    --command.config /etc/confluent/configs/client.properties
+```
+
+This should fail.
+
 
 === Schema Registry RBAC using OAuth
 
@@ -260,7 +289,7 @@ export CLIENT_APP_ACCESS_TOKEN=$(curl -s \
 2. Login to Confluent Control Center to validate messages being produced to topic `test-topic-datagen`, use credentials `c3superuser` and `c3superuser` to login to C3 using SSO.
 3. Alternatively, you can start a consumer in the broker container to see the messages getting produced
 ```shell
-docker exec -it broker /bin/bash
+docker exec -it broker1 /bin/bash
 ```
 ```console
 kafka-console-consumer \
@@ -425,7 +454,7 @@ When done playing around shut down the containers
 * Get the logs of a service
 
 ```shell 
-broker logs -f <container name>
+docker compose logs -f <container name>
 ```
 
 * Remove a single container. This will remove container and all logs. This will not delete the cached image
