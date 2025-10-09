@@ -52,7 +52,7 @@ services:
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
       CLUSTER_ID: 'vHCgQyIrRHG8Jv27qI2h3Q'
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_SUPER_USERS: User:admin;User:$SUPERUSER_PRINCIPAL_ID;User:$AZURE_CP_ENTERPRISE_APPLICATION_ID
+      KAFKA_SUPER_USERS: User:admin;User:$SUPERUSER_PRINCIPAL_ID
       KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
       KAFKA_LOG4J_LOGGERS: "kafka.authorizer.logger=INFO,io.confluent.rest-utils=DEBUG,io.confluent.rbacapi=INFO,io.confluent.tokenapi=INFO,io.confluent.security.auth=INFO,io.confluent.security.store=INFO,io.confluent.common.security.jetty=INFO"
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
@@ -97,7 +97,7 @@ services:
         scope="$AZURE_OAUTH_SCOPE";
 
       KAFKA_LISTENER_NAME_EXTERNALOAUTH_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.confluent.kafka.server.plugins.auth.token.CompositeBearerValidatorCallbackHandler
-      KAFKA_LISTENER_NAME_EXTERNA_OAUTHL_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
+      KAFKA_LISTENER_NAME_EXTERNALOAUTH_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
       KAFKA_LISTENER_NAME_CONTROLLER_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
       KAFKA_CONFLUENT_OAUTH_GROUPS_CLAIM_NAME: $GROUP_CLAIM_NAME
 
@@ -672,6 +672,10 @@ services:
 
       CONTROL_CENTER_METRICS_TOPIC_REPLICATION: 1
       CONTROL_CENTER_METRICS_TOPIC_PARTITIONS: 1
+      #confluent.controlcenter.cmf.healthcheck.interval.sec=600
+      # The health check is always enabled, but will fail in our demo. Setting the interval to a high value to avoid log spam
+      # Not necessary in Control Center Version 2.3 and above
+      CONTROL_CENTER_CMF_HEALTHCHECK_INTERVAL_SEC: 600000
 
       # Amount of heap to use for internal caches. Increase for better throughput
       CONTROL_CENTER_STREAMS_CACHE_MAX_BYTES_BUFFERING: 100000000
@@ -681,6 +685,7 @@ services:
       # HTTP and HTTPS to Control Center UI
       CONTROL_CENTER_CONFLUENT_CONTROLCENTER_REST_LISTENERS: http://0.0.0.0:9021
       CONTROL_CENTER_CONFLUENT_CONTROLCENTER_REST_ADVERTISED_URL: http://control-center:9021
+      CONTROL_CENTER_CONFLUENT_CONTROLCENTER_REST_AUTHENTICATION_METHOD: BEARER
 
       # Connect
       CONTROL_CENTER_CONNECT_CONNECT1_CLUSTER: http://connect:8083
