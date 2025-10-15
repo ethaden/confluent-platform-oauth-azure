@@ -89,7 +89,7 @@ sudo vi /etc/hosts
 Add these lines at the end of the file:
 
 ```shell
-127.0.0.1       broker
+127.0.0.1       broker1
 127.0.0.1       schema-registry
 127.0.0.1       connect
 127.0.0.1       ksqldb-server
