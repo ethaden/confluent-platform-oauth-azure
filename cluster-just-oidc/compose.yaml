@@ -52,13 +52,13 @@ services:
       CLUSTER_ID: ${CLUSTER_ID}
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_SUPER_USERS: User:${SUPERUSER_PRINCIPAL_ID}
-      KAFKA_LOG4J_ROOT_LOGLEVEL: TRACE
-      KAFKA_LOG4J_LOGLEVEL: TRACE
+      KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
+      KAFKA_LOG4J_LOGLEVEL: INFO
       #KAFKA_LOG4J_LOGGERS: "kafka.authorizer.logger=DEBUG,io.confluent.rest-utils=DEBUG,io.confluent.rbacapi=DEBUG,io.confluent.tokenapi=DEBUG,io.confluent.security.auth=DEBUG,io.confluent.security.store=DEBUG,io.confluent.common.security.jetty=DEBUG"
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: OAUTHBEARER
       KAFKA_SASL_ENABLED_MECHANISMS: OAUTHBEARER
-#      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=${IDP_TOKEN_ENDPOINT},${IDP_JWKS_ENDPOINT}'
-      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=${IDP_TOKEN_ENDPOINT},${IDP_JWKS_ENDPOINT}'
+#      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
+      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
 
 #inter.broker.listener.name=EXTERNAL DONE (INTERNAL)
 #sasl.mechanism.inter.broker.protocol=OAUTHBEARER DONE
@@ -187,6 +187,8 @@ services:
       KAFKA_KAFKA_REST_CLIENT_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
       KAFKA_KAFKA_REST_CLIENT_SASL_JAAS_CONFIG: |
         org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+        unsecuredLoginStringClaim_sub="thePrincipalName" \
+        publicKeyPath="/keys/public.pem" \
         clientId="${AZURE_CP_APPLICATION_ID}" \
         clientSecret="${AZURE_CP_APPLICATION_SECRET}" \
         scope="${AZURE_OAUTH_SCOPE}";
@@ -270,6 +272,7 @@ services:
       C3_ENTERPRISE_APPLICATION_ID: ${C3_ENTERPRISE_APPLICATION_ID}
       CLIENT_ENTERPRISE_APPLICATION_ID: ${CLIENT_ENTERPRISE_APPLICATION_ID}
       IDP_TOKEN_ENDPOINT: ${IDP_TOKEN_ENDPOINT}
+      CLUSTER_ID: ${CLUSTER_ID}
     entrypoint: /bin/bash
     command: "/usr/bin/init_permissions.sh"
     deploy: 
@@ -301,7 +304,7 @@ services:
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker1:9092'
       SCHEMA_REGISTRY_GROUP_ID: schema-registry-demo
-      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=${IDP_TOKEN_ENDPOINT},${IDP_JWKS_ENDPOINT}'
+      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
       SCHEMA_REGISTRY_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=*'
 
       SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: OAUTHBEARER
@@ -376,7 +379,7 @@ services:
       CONNECT_GROUP_ID: "connect-cluster"
       CONNECT_PRODUCER_CLIENT_ID: "connect-worker-producer"
       CONNECT_PRODUCER_ENABLE_IDEMPOTENCE: 'true'
-      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=${IDP_TOKEN_ENDPOINT},${IDP_JWKS_ENDPOINT}'
+      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
 
       CONNECT_CONFIG_STORAGE_TOPIC: connect-configs
       CONNECT_OFFSET_STORAGE_TOPIC: connect-offsets
@@ -522,7 +525,7 @@ services:
       - "8088:8088"
       - "1238:1238"
     environment:
-      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=${IDP_TOKEN_ENDPOINT},${IDP_JWKS_ENDPOINT}'
+      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
       KSQL_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=${IDP_TOKEN_ENDPOINT},${IDP_JWKS_ENDPOINT},${IDP_EXPECTED_ISSUER}'
       CUB_CLASSPATH: '/usr/share/java/confluent-security/ksql/*:/usr/share/java/ksqldb-server/*:/usr/share/java/cp-base-new/*'
 
@@ -658,7 +661,7 @@ services:
     environment:
       CUB_CLASSPATH: '/usr/share/java/confluent-control-center/*:/usr/share/java/rest-utils/*:/usr/share/java/confluent-common/*:/usr/share/java/confluent-security/kafka-rest/*:/usr/share/java/kafka-rest/:/usr/share/java/cp-base-new/*'
       EXTRA_ARGS: "-javaagent:/usr/bin/jmx/jmx_prometheus_javaagent-0.15.0.jar=1237:/usr/bin/jmx/exporter.yml"
-      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=${IDP_TOKEN_ENDPOINT},${IDP_JWKS_ENDPOINT}'
+      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
       CONTROL_CENTER_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=*'
 
       # If using Confluent Health+ for monitoring and alerting, uncomment the line below to run in management mode.

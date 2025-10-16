@@ -238,6 +238,7 @@ services:
       C3_ENTERPRISE_APPLICATION_ID: ${C3_ENTERPRISE_APPLICATION_ID}
       CLIENT_ENTERPRISE_APPLICATION_ID: ${CLIENT_ENTERPRISE_APPLICATION_ID}
       IDP_TOKEN_ENDPOINT: ${IDP_TOKEN_ENDPOINT}
+      CLUSTER_ID: ${CLUSTER_ID}
     entrypoint: /bin/bash
     command: "/usr/bin/init_permissions.sh"
     deploy: 

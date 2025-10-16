@@ -23,6 +23,8 @@ https://github.com/confluentinc/cp-all-in-one
 
 Create an "App registrations" in your EntraID tenant. This resource is the global representation of your Confluent Cloud organization. It is connected to one Enterprise Application per Azure Tenant, each of them represent the identity of your Confluent Cloud organization in that tenant.
 
+If you want to use the `confluent` cli, make sure to allow "public public client flows" (under `Manage` -> `Authentication`).
+
 Conceptually, you could either use your user identity or another app registration representing your own application to request access to the application registration that represents your Confluent Cloud organization. These are completely separate entities in Entra ID. Make sure you don't mix these up with the entities representing your Confluent Cloud organization!
 
 Therefore, when we talk about the app registration or the enterprise application in the following text, we always refer to the app registration/enterprise application which represents your Confluent Cloud organization.
@@ -138,12 +140,12 @@ source helper/set_user_tokens.sh
 
 ```shell
 docker compose exec broker1 kafka-console-producer \
-    --bootstrap-server broker1:9095 \
+    --bootstrap-server broker1:9092 \
     --topic test \
     --producer.config /etc/confluent/configs/client.properties
 
 docker compose exec broker1 kafka-console-consumer \
-    --bootstrap-server broker1:9095 \
+    --bootstrap-server broker1:9092 \
     --from-beginning \
     --topic test \
     --consumer.config /etc/confluent/configs/client.properties
@@ -155,9 +157,10 @@ Let's try to create a new topic as user `client`.
 
 ```shell
 docker compose exec broker1 kafka-topics \
-    --bootstrap-server broker1:9095 \
-    --topic test123 \
-    --command.config /etc/confluent/configs/client.properties
+    --bootstrap-server broker1:9092 \
+    --create \
+    --topic test \
+    --command-config /etc/confluent/configs/client.properties
 ```
 
 This should work as there is an RBAC role granting ResourceOwner to all topics starting with `test` to the `client` user.
@@ -166,9 +169,9 @@ Try to create another topic:
 
 ```shell
 docker compose exec broker1 kafka-topics \
-    --bootstrap-server broker1:9095 \
+    --bootstrap-server broker1:9092 \
     --topic abcde \
-    --command.config /etc/confluent/configs/client.properties
+    --command-config /etc/confluent/configs/superuser.properties
 ```
 
 This should fail.
@@ -207,7 +210,7 @@ docker exec -it schema-registry /bin/bash
 
 ```shell
  kafka-avro-console-producer \
-  --bootstrap-server broker:9095 \
+  --bootstrap-server broker:9092 \
   --property bearer.auth.credentials.source=OAUTHBEARER \
   --property bearer.auth.issuer.endpoint.url=http://keycloak:8080/realms/cp/protocol/openid-connect/token \
   --property bearer.auth.client.id=client_app1 \
@@ -234,7 +237,7 @@ The producer will wait at the command prompt for data to be supplied. You can pr
 
     ```console
     kafka-avro-console-consumer \
-   --bootstrap-server broker:9095 \
+   --bootstrap-server broker:9092 \
    --property bearer.auth.credentials.source=OAUTHBEARER \
    --property bearer.auth.issuer.endpoint.url=http://keycloak:8080/realms/cp/protocol/openid-connect/token \
    --property bearer.auth.client.id=client_app1 \
@@ -293,7 +296,7 @@ docker exec -it broker1 /bin/bash
 ```
 ```console
 kafka-console-consumer \
---bootstrap-server broker:9095 \
+--bootstrap-server broker:9092 \
 --topic test-topic-datagen \
 --consumer.config /etc/confluent/configs/client.properties
 ```
@@ -392,7 +395,6 @@ curl --http1.1 \
 
 The JSON output should include the message `Query Completed`.
 
-
 === SSO login in C3
 You can use any user defined in the IDP to do interactive login to Confluent Control Center. Users part of group "g1" would get a permission of superuser.
 In Keycloak you can use below configured users.  
@@ -445,6 +447,48 @@ This setup includes Prometheus and Grafana to visualize metrics.
 Grafana can be accessed via http://localhost:3000 using the `admin:admin` credentials.
 From menu select "Authentication Dashboard"
 JMX exporter configs are present [here](./metrics/exporter.yml), which can tweaked as per your liking.
+
+=== Logging into Confluent Platform using the CLI
+
+If you are on the same machine and are able to use a browser, you can run:
+
+```console
+confluent login --url http://localhost:8091
+```
+
+Otherwise, you can use
+
+```console
+confluent login --url http://localhost:8091 --no-browser
+```
+
+Follow the instructions to complete the login. Note: The token expires rather quickly. You might need to reauthenticate from time to time.
+
+For simplicity, use a variable holding the kafka endpoint.
+
+```console
+export CONFLUENT_REST_URL=http://broker1:8091/kafka
+```
+
+Optionally: Get a token for authenticating to Confluent Platform: 
+
+```confole
+export TOKEN=$(confluent iam user describe -o json | jq -r '.authentication_token')
+```
+
+Access services with the token, i.e. kSQLdb (for simplicity, we run this in the ksqdb-server container where the `ksql` binary is installed already):
+
+```console
+docker compose exec -ti ksqldb-server ksql http://ksqldb-server:8088 --token $TOKEN
+```
+
+Show the topics:
+
+```console
+show topics;
+```
+
+
 
 === Troubleshooting
 
