@@ -427,11 +427,28 @@ c3superuser:c3superuser
 
 You can try to login by specifying your MDS URL for CP cluster
 
-```
+```console
 $PATH_TO_CLI_BINARY/confluent login --url http://localhost:8091
 ```
 
+Add flag `--no-browser` if you are running this on a remote machine without browser access.
+
 If you need to logout completely for testing, you need to logout from the `cp` realm in keycloak by pointing your browser to `http://keycloak:8080/realms/cp/account/` and pressing `Sign Out`.
+
+Optionally, you can get the access token issued by the `confluent` CLI:
+
+```console
+export TOKEN=$(confluent iam user describe -o json|jq -r .authentication_tok
+en)
+```
+
+This token can be used to access the REST API of Confluent Platform services, for example:
+
+```console
+curl 'http://broker1:8091/kafka/v3/clusters/test' --header 'Content-Type: application/json' --header "Authorization: Bearer $TOKEN"
+```
+
+
 
 ==== Firefox: Special settings for testing SSO via SOCKS proxy
 

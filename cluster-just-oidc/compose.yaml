@@ -55,6 +55,8 @@ services:
       KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
       KAFKA_LOG4J_LOGLEVEL: INFO
       #KAFKA_LOG4J_LOGGERS: "kafka.authorizer.logger=DEBUG,io.confluent.rest-utils=DEBUG,io.confluent.rbacapi=DEBUG,io.confluent.tokenapi=DEBUG,io.confluent.security.auth=DEBUG,io.confluent.security.store=DEBUG,io.confluent.common.security.jetty=DEBUG"
+      #KAFKA_LOG4J_LOGGERS: "kafka.authorizer.logger=DEBUG,io.confluent.rest-utils=DEBUG,io.confluent.rbacapi=DEBUG,io.confluent.tokenapi=DEBUG,io.confluent.security.auth=DEBUG,io.confluent.security.store=DEBUG,io.confluent.common.security.jetty=DEBUG"
+      KAFKA_LOG4J_LOGGERS: "io.confluent.rest-utils.requests=DEBUG,io.confluent.tokenapi=DEBUG,io.confluent.common.security.jetty=DEBUG,io.confluent.mds.request.logger=DEBUG"
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: OAUTHBEARER
       KAFKA_SASL_ENABLED_MECHANISMS: OAUTHBEARER
 #      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
@@ -145,6 +147,17 @@ services:
       KAFKA_CONFLUENT_METADATA_SERVER_OAUTHBEARER_EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
       KAFKA_CONFLUENT_METADATA_SERVER_OAUTHBEARER_SUB_CLAIM_NAME: ${SUB_CLAIM_NAME}
       KAFKA_CONFLUENT_METADATA_SERVER_OAUTHBEARER_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
+      # Should only be required when configuring a secondary cluster which is supposed to access another MDS cluster (hosted by the primary cluster)
+      #KAFKA_CONFLUENT_METADATA_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      #KAFKA_CONFLUENT_METADATA_SASL_MECHANISM: OAUTHBEARER
+      #KAFKA_CONFLUENT_METADATA_SASL_LOGIN_CALLBACK_HANDLER_CLASS: 'org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler'
+      #KAFKA_CONFLUENT_METADATA_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
+      #KAFKA_CONFLUENT_METADATA_SASL_JAAS_CONFIG: |
+      #  org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+      #  clientId="${RP_CLIENT_ID}" \
+      #  clientSecret="${RP_CLIENT_SECRET}" \
+      #  scope="${AZURE_OAUTH_SCOPE}";
+
       #KAFKA_CONFLUENT_METADATA_SERVER_SSL_TRUSTSTORE_LOCATION: /keys/truststore.jks
       #KAFKA_CONFLUENT_METADATA_SERVER_SSL_TRUSTSTORE_TYPE: JKS
       #KAFKA_CONFLUENT_METADATA_SERVER_SSL_TRUSTSTORE_PASSWORD: ${TRUSTSTORE_PASSWORD}
@@ -165,7 +178,10 @@ services:
       KAFKA_KAFKA_REST_BOOTSTRAP_SERVERS: EXTERNALOAUTH://broker1:9092
       KAFKA_KAFKA_REST_KAFKA_REST_RESOURCE_EXTENSION_CLASS: io.confluent.kafkarest.security.KafkaRestSecurityResourceExtension
       # See https://docs.confluent.io/platform/current/security/authentication/multi-protocol/authenticationhandler.html
-      KAFKA_KAFKA_REST_SERVLET_INITIALIZOR_CLASSES: io.confluent.common.security.jetty.initializer.AuthenticationHandler
+      KAFKA_KAFKA_REST_REST_SERVLET_INITIALIZOR_CLASSES: io.confluent.common.security.jetty.initializer.AuthenticationHandler
+      # WRONG! Use previous lines
+      #KAFKA_KAFKA_REST_SERVLET_INITIALIZOR_CLASSES: io.confluent.rest.auth.security.AuthenticationHandler
+      #KAFKA_KAFKA_REST_AUTHENTICATION_METHOD: OAUTH
       KAFKA_KAFKA_REST_AUTHENTICATION_ROLES: "**"
       KAFKA_KAFKA_REST_OAUTHBEARER_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT}
       KAFKA_KAFKA_REST_OAUTHBEARER_EXPECTED_ISSUER: ${IDP_EXPECTED_ISSUER}
@@ -175,6 +191,7 @@ services:
       KAFKA_KAFKA_REST_PUBLIC_KEY_PATH: /keys/public.pem
 
       # EmbeddedKafkaRest: MDS Client configuration
+      KAFKA_REST_CONFLUENT_REST_AUTH_PROPAGATE_METHOD: JETTY_AUTH
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: OAUTHBEARER
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
