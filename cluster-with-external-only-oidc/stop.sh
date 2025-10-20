@@ -1,2 +1,2 @@
 docker compose down -v
-rm -f ./keypair/*.pem
+rm -f ./keys/*.pem ./keys/*.jks

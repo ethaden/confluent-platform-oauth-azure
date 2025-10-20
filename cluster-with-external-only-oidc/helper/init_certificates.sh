@@ -11,12 +11,12 @@ apply_shell_expansion() {
     done < $1
 }
 
-MDS_KEYPAIR_FILE="$2/data/keypair.pem"
-MDS_PUBLIC_KEY="$2/data/public.pem"
-TRUSTSTORE_FILE="$2/data/truststore.jks"
+MDS_KEYPAIR_FILE="/keys/keypair.pem"
+MDS_PUBLIC_KEY="/keys/public.pem"
+TRUSTSTORE_FILE="/keys/truststore.jks"
 
 # Generate keys and certificates used by MDS
-if [ \! -e /data/keypair/keypair.pem ]; then
+if [ \! -e ${MDS_KEYPAIR_FILE} ]; then
     echo -e "Generate keys and certificates used for MDS"
     openssl genrsa -out ${MDS_KEYPAIR_FILE} 2048; openssl rsa -in ${MDS_KEYPAIR_FILE} -outform PEM -pubout -out ${MDS_PUBLIC_KEY}
     chmod 644 ${MDS_KEYPAIR_FILE} ${MDS_PUBLIC_KEY}

@@ -31,13 +31,13 @@ services:
       init_certificates:
         condition: service_completed_successfully
     healthcheck:
-      test: curl -fail --silent --insecure http://broker1:8091/v1/metadata/id || exit 1
+      test: curl -fail --silent --insecure http://broker1:8090/v1/metadata/id || exit 1
       interval: 10s
       retries: 5
       start_period: 20s
     ports:
       - "9092:9092" # KAFKA with OAUTHBEARER
-      - "8091:8091" # MDS
+      - "8090:8090" # MDS
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:SASL_PLAINTEXT,INTERNAL:SASL_PLAINTEXT,EXTERNALOAUTH:SASL_PLAINTEXT
@@ -55,7 +55,6 @@ services:
       KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
       KAFKA_LOG4J_LOGLEVEL: INFO
       #KAFKA_LOG4J_LOGGERS: "kafka.authorizer.logger=DEBUG,io.confluent.rest-utils=DEBUG,io.confluent.rbacapi=DEBUG,io.confluent.tokenapi=DEBUG,io.confluent.security.auth=DEBUG,io.confluent.security.store=DEBUG,io.confluent.common.security.jetty=DEBUG"
-      KAFKA_LOG4J_LOGGERS: "io.confluent.rest-utils.requests=DEBUG,io.confluent.tokenapi=DEBUG,io.confluent.common.security.jetty=DEBUG,io.confluent.mds.request.logger=DEBUG"
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: OAUTHBEARER
       KAFKA_SASL_ENABLED_MECHANISMS: OAUTHBEARER
       KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT'
@@ -70,6 +69,10 @@ services:
       KAFKA_LISTENER_NAME_INTERNAL_SASL_OAUTHBEARER_EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
       KAFKA_LISTENER_NAME_INTERNAL_SASL_OAUTHBEARER_SUB_CLAIM_NAME: ${SUB_CLAIM_NAME}
       KAFKA_LISTENER_NAME_INTERNAL_OAUTHBEARER_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
+      # Note: the 'unsecuredLoginStringClaim_sub="thePrincipalName"' is currently required for listeners when using RBAC in Confluent Platform for handling MDS-issued tokens.
+      # It might be removed in future versions.
+      # Explanation: The following JAAS configuration is used for the listener that accepts OAUTHBEARER tokens for internal Kafka broker communication as well as for those internal clients which connects to the internal broker listener.
+      # Therefore we need to specify clientId and clientSecret of the Confluent Platform Application Registration here, to allow those internal clients to successfully authenticate to EntraID.
       KAFKA_LISTENER_NAME_INTERNAL_OAUTHBEARER_SASL_JAAS_CONFIG: |
         org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
         unsecuredLoginStringClaim_sub="thePrincipalName" \
@@ -87,6 +90,10 @@ services:
       KAFKA_LISTENER_NAME_CONTROLLER_SASL_OAUTHBEARER_EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
       KAFKA_LISTENER_NAME_CONTROLLER_SASL_OAUTHBEARER_SUB_CLAIM_NAME: ${SUB_CLAIM_NAME}
       KAFKA_LISTENER_NAME_CONTROLLER_OAUTHBEARER_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
+      # Note: the 'unsecuredLoginStringClaim_sub="thePrincipalName"' is currently required for listeners when using RBAC in Confluent Platform for handling MDS-issued tokens.
+      # It might be removed in future versions.
+      # Explanation: The following JAAS configuration is used for the listener that accepts OAUTHBEARER tokens for Kafka Controller communication as well as for the internal clients which connects to the controller listener.
+      # Therefore we need to specify clientId and clientSecret of the Confluent Platform Application Registration here, to allow those internal clients to successfully authenticate to EntraID.
       KAFKA_LISTENER_NAME_CONTROLLER_OAUTHBEARER_SASL_JAAS_CONFIG: |
         org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
         unsecuredLoginStringClaim_sub="thePrincipalName" \
@@ -104,8 +111,11 @@ services:
       KAFKA_LISTENER_NAME_EXTERNALOAUTH_SASL_OAUTHBEARER_SUB_CLAIM_NAME: ${SUB_CLAIM_NAME}
       KAFKA_LISTENER_NAME_EXTERNALOAUTH_OAUTHBEARER_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
       KAFKA_CONFLUENT_OAUTH_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
-      # unsecuredLoginStringClaim_sub="thePrincipalName" is just a workaround for some OSS-specific issues. It needs to be configured but will be ignored. The value needs to be as it is.
-      # DOUBLE CHECK!
+      # Note: the 'unsecuredLoginStringClaim_sub="thePrincipalName"' is currently required for listeners when using RBAC in Confluent Platform for handling MDS-issued tokens.
+      # It might be removed in future versions.
+      # Explanation: The following JAAS configuration is used only for the listener that accepts OAUTHBEARER tokens from external clients to Kafka brokers.
+      # Therefore, we do not need clientId and clientSecret of the Confluent Platform Application Registration here, as only the external clients need them for authenticating to EntraID.
+      # This listener just needs to be able to validate the access tokens presented by the external clients (issued by EntraID). 
       KAFKA_LISTENER_NAME_EXTERNALOAUTH_OAUTHBEARER_SASL_JAAS_CONFIG: |
         org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
         unsecuredLoginStringClaim_sub="thePrincipalName" \
@@ -119,8 +129,8 @@ services:
       # MDS (server configuration)
       KAFKA_CONFLUENT_METADATA_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONFLUENT_METADATA_SERVER_AUTHENTICATION_METHOD: BEARER
-      KAFKA_CONFLUENT_METADATA_SERVER_LISTENERS: http://0.0.0.0:8091
-      KAFKA_CONFLUENT_METADATA_SERVER_ADVERTISED_LISTENERS: http://broker1:8091
+      KAFKA_CONFLUENT_METADATA_SERVER_LISTENERS: http://0.0.0.0:8090
+      KAFKA_CONFLUENT_METADATA_SERVER_ADVERTISED_LISTENERS: http://broker1:8090
       KAFKA_CONFLUENT_METADATA_SERVER_TOKEN_KEY_PATH: /keys/keypair.pem
       KAFKA_CONFLUENT_METADATA_SERVER_OPENAPI_ENABLE: 'true'
       # Use MDS without LDAP, OAuth token is required
@@ -168,7 +178,7 @@ services:
       KAFKA_KAFKA_REST_PUBLIC_KEY_PATH: /keys/public.pem
 
       # EmbeddedKafkaRest: MDS Client configuration
-      KAFKA_KAFKA_REST_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
+      KAFKA_KAFKA_REST_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8090
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: OAUTHBEARER
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CLIENT_ID: ${RP_CLIENT_ID}
@@ -329,7 +339,7 @@ services:
       SCHEMA_REGISTRY_REST_AUTH_JMX_ENABLED: 'true'
 
       # For connecting to MDS
-      SCHEMA_REGISTRY_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
+      SCHEMA_REGISTRY_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8090
       SCHEMA_REGISTRY_CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: OAUTHBEARER
       SCHEMA_REGISTRY_CONFLUENT_METADATA_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
       SCHEMA_REGISTRY_CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CLIENT_ID: $SR_CLIENT_ID
@@ -462,7 +472,7 @@ services:
       CONNECT_OAUTHBEARER_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
 
        # For connecting to MDS
-      CONNECT_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
+      CONNECT_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8090
       CONNECT_CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: OAUTHBEARER
       CONNECT_CONFLUENT_METADATA_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
       CONNECT_CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CLIENT_ID: ${CONNECT_CLIENT_ID}
@@ -553,7 +563,7 @@ services:
       KSQL_OAUTHBEARER_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
 
       # Used by ksqlDB's REST layer to connect to MDS to verify tokens and authenticate clients
-      KSQL_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
+      KSQL_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8090
       KSQL_CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: OAUTHBEARER
       KSQL_CONFLUENT_METADATA_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
       KSQL_CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CLIENT_ID: ${KSQL_CLIENT_ID}
@@ -724,7 +734,7 @@ services:
 
 
       # Used by Control Center to connect to MDS to verify tokens and authenticate clients
-      CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
+      CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8090
       CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: OAUTHBEARER
       CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CREDENTIALS_SOURCE: OAUTHBEARER
       CONFLUENT_METADATA_OAUTHBEARER_LOGIN_CLIENT_ID: ${C3_CLIENT_ID}

@@ -409,14 +409,14 @@ You can use any user defined in IDP to do interactive login to Confluent Control
 You can login by specifying your MDS URL for CP cluster (if asked for a code just use the `user_code` which is already part of the URL).
 
 ```console
-confluent login --url http://localhost:8091/
+confluent login --url http://localhost:8090/
 ```
 Note, that we aren't using the suffix `/kafka` here (see below), as the login endpoint is part of the MDS service, not the Kafka REST Proxy.
 
 For accessing REST Proxy endpoints of your Confluent Platform instance with the `confluent` CLI, you can set the following environment variable and skip the `--url` parameter in the commands:
 
 ```console
-export CONFLUENT_REST_URL=http://localhost:8091/kafka
+export CONFLUENT_REST_URL=http://localhost:8090/kafka
 ```
 
 Add flag `--no-browser` if you are running this on a remote machine without browser access.
@@ -451,7 +451,7 @@ export TOKEN=$(confluent iam user describe -o json|jq -r .authentication_token)
 This token can be used to access the REST API of Confluent Platform services, for example:
 
 ```console
-curl 'http://broker1:8091/kafka/v3/clusters' --header 'Content-Type: application/json' --header "Authorization: Bearer $TOKEN"
+curl 'http://broker1:8090/kafka/v3/clusters' --header 'Content-Type: application/json' --header "Authorization: Bearer $TOKEN"
 ```
 
 
@@ -476,13 +476,13 @@ JMX exporter configs are present [here](./metrics/exporter.yml), which can tweak
 If you are on the same machine and are able to use a browser, you can run:
 
 ```console
-confluent login --url http://localhost:8091
+confluent login --url http://localhost:8090
 ```
 
 Otherwise, you can use
 
 ```console
-confluent login --url http://localhost:8091 --no-browser
+confluent login --url http://localhost:8090 --no-browser
 ```
 
 Follow the instructions to complete the login. Note: The token expires rather quickly. You might need to reauthenticate from time to time.
@@ -490,7 +490,7 @@ Follow the instructions to complete the login. Note: The token expires rather qu
 For simplicity, use a variable holding the kafka endpoint.
 
 ```console
-export CONFLUENT_REST_URL=http://broker1:8091/kafka
+export CONFLUENT_REST_URL=http://broker1:8090/kafka
 ```
 
 Optionally: Get a token for authenticating to Confluent Platform: 

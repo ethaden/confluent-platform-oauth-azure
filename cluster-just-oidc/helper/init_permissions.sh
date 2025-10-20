@@ -66,7 +66,7 @@ assign_role_bindings()
 auth_token=$(curl -s -d "client_id=$SUPERUSER_CLIENT_ID" -d "client_secret=$SUPERUSER_CLIENT_SECRET" -d "scope=$SUPERUSER_CLIENT_SCOPE" -d "grant_type=client_credentials" $IDP_TOKEN_ENDPOINT | grep -Po '"access_token": *\K"[^"]*"' | grep -o '[^"]*')
 echo $auth_token
 
-MDS_RBAC_ENDPOINT=http://broker1:8091/security/1.0/principals
+MDS_RBAC_ENDPOINT=http://broker1:8090/security/1.0/principals
 
 _assign_sr_role_bindings  $MDS_RBAC_ENDPOINT $auth_token
 _assign_connect_role_bindings $MDS_RBAC_ENDPOINT $auth_token
