@@ -23,6 +23,8 @@ https://github.com/confluentinc/cp-all-in-one
 
 Create an "App registrations" in your EntraID tenant. This resource is the global representation of your Confluent Cloud organization. It is connected to one Enterprise Application per Azure Tenant, each of them represent the identity of your Confluent Cloud organization in that tenant.
 
+We just use `Access tokens` (you can optionally disable `ID tokens`) in the `Authentication` settings. Note, implicit flows are not required either.
+
 If you want to use the `confluent` cli, make sure to allow "public public client flows" (under `Manage` -> `Authentication`).
 
 Conceptually, you could either use your user identity or another app registration representing your own application to request access to the application registration that represents your Confluent Cloud organization. These are completely separate entities in Entra ID. Make sure you don't mix these up with the entities representing your Confluent Cloud organization!
@@ -396,56 +398,60 @@ curl --http1.1 \
 The JSON output should include the message `Query Completed`.
 
 === SSO login in C3
-You can use any user defined in the IDP to do interactive login to Confluent Control Center. Users part of group "g1" would get a permission of superuser.
-In Keycloak you can use below configured users.  
-
-```shell
-c3user:c3user
-c3superuser:c3superuser
-```
-
-`c3superuser` is a superuser who can assign role bindings to other users
-`c3user` doesn't have any role bindings. This user can authenticate with IDP but will not have access to any cluster by default. The idea is to demo onboarding experience for a user or group.
-
-Keycloak UI can be accessed at http://localhost:8080 (admin/admin)
+You can use any user defined in the IDP to do interactive login to Confluent Control Center.
 
 === SSO login in CLI 
 
-1. [Download](https://docs.confluent.io/confluent-cli/current/install.html) the CLI binary that supports CLI SSO login for Confluent Platform.
-2. You can enable CLI SSO in the CLI context, or by simply exporting it 
+[Download](https://docs.confluent.io/confluent-cli/current/install.html) the CLI binary that supports CLI SSO login for Confluent Platform.
 
-```
-export CONFLUENT_PLATFORM_SSO=true
-```
-You can use any user defined in IDP to do interactive login to Confluent Control Center. Users part of group "g1" would get a permission of superuser.
-In Keycloak you can use below configured users.
+You can use any user defined in IDP to do interactive login to Confluent Control Center.
 
-```shell
-c3user:c3user
-c3superuser:c3superuser
-```
-
-You can try to login by specifying your MDS URL for CP cluster
+You can login by specifying your MDS URL for CP cluster (if asked for a code just use the `user_code` which is already part of the URL).
 
 ```console
-$PATH_TO_CLI_BINARY/confluent login --url http://localhost:8091
+confluent login --url http://localhost:8091/
+```
+Note, that we aren't using the suffix `/kafka` here (see below), as the login endpoint is part of the MDS service, not the Kafka REST Proxy.
+
+For accessing REST Proxy endpoints of your Confluent Platform instance with the `confluent` CLI, you can set the following environment variable and skip the `--url` parameter in the commands:
+
+```console
+export CONFLUENT_REST_URL=http://localhost:8091/kafka
 ```
 
 Add flag `--no-browser` if you are running this on a remote machine without browser access.
 
-If you need to logout completely for testing, you need to logout from the `cp` realm in keycloak by pointing your browser to `http://keycloak:8080/realms/cp/account/` and pressing `Sign Out`.
+After successful login, you can now use the CLI to interact with Confluent Platform.
+For example, list the topics configure in the the cluster:
+
+```consolse
+confluent kafka topic list --url $CONFLUENT_REST_URL/kafka
+```
+
+List schemas:
+
+```consolse
+confluent schema-registry schema list --schema-registry-endpoint=http://localhost:8081
+```
+
+Create a new topic:
+
+```consolse
+confluent kafka topic create mytest --url $CONFLUENT_REST_URL/kafka
+```
+
+
 
 Optionally, you can get the access token issued by the `confluent` CLI:
 
 ```console
-export TOKEN=$(confluent iam user describe -o json|jq -r .authentication_tok
-en)
+export TOKEN=$(confluent iam user describe -o json|jq -r .authentication_token)
 ```
 
 This token can be used to access the REST API of Confluent Platform services, for example:
 
 ```console
-curl 'http://broker1:8091/kafka/v3/clusters/test' --header 'Content-Type: application/json' --header "Authorization: Bearer $TOKEN"
+curl 'http://broker1:8091/kafka/v3/clusters' --header 'Content-Type: application/json' --header "Authorization: Bearer $TOKEN"
 ```
 
 

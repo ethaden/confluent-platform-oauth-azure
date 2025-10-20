@@ -55,31 +55,15 @@ services:
       KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
       KAFKA_LOG4J_LOGLEVEL: INFO
       #KAFKA_LOG4J_LOGGERS: "kafka.authorizer.logger=DEBUG,io.confluent.rest-utils=DEBUG,io.confluent.rbacapi=DEBUG,io.confluent.tokenapi=DEBUG,io.confluent.security.auth=DEBUG,io.confluent.security.store=DEBUG,io.confluent.common.security.jetty=DEBUG"
-      #KAFKA_LOG4J_LOGGERS: "kafka.authorizer.logger=DEBUG,io.confluent.rest-utils=DEBUG,io.confluent.rbacapi=DEBUG,io.confluent.tokenapi=DEBUG,io.confluent.security.auth=DEBUG,io.confluent.security.store=DEBUG,io.confluent.common.security.jetty=DEBUG"
       KAFKA_LOG4J_LOGGERS: "io.confluent.rest-utils.requests=DEBUG,io.confluent.tokenapi=DEBUG,io.confluent.common.security.jetty=DEBUG,io.confluent.mds.request.logger=DEBUG"
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: OAUTHBEARER
       KAFKA_SASL_ENABLED_MECHANISMS: OAUTHBEARER
-#      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
-      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
+      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT'
 
-#inter.broker.listener.name=EXTERNAL DONE (INTERNAL)
-#sasl.mechanism.inter.broker.protocol=OAUTHBEARER DONE
-#listener.name.external.oauthbearer.sasl.login.callback.handler.class=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler DONE
-#listener.name.external.sasl.oauthbearer.token.endpoint.url=<idp-token-endpoint> DONE
-#listener.name.external.oauthbearer.sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required DONE
-#clientId="<client-id>"
-#clientSecret="<client-secret>"
-#scope="<scope>";
-# Might be required:
-#listener.name.external.sasl.oauthbearer.jwks.endpoint.url=<idp-jwks-endpoint> DONE
-#listener.name.external.sasl.oauthbearer.expected.audience=<idp-audience> DONE
-#listener.name.external.principal.builder.class=io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder DONE
-#confluent.oauth.groups.claim.name=groups
       KAFKA_LISTENER_NAME_INTERNAL_SASL_ENABLED_MECHANISMS: OAUTHBEARER
       KAFKA_LISTENER_NAME_INTERNAL_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.confluent.kafka.server.plugins.auth.token.CompositeBearerValidatorCallbackHandler
       KAFKA_LISTENER_NAME_INTERNAL_OAUTHBEARER_SASL_LOGIN_CALLBACK_HANDLER_CLASS: org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler
       KAFKA_LISTENER_NAME_INTERNAL_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
-      #KAFKA_LISTENER_NAME_INTERNAL_OAUTHBEARER_SASL_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT} NOT
       # Required for RBAC
       KAFKA_LISTENER_NAME_INTERNAL_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
       KAFKA_LISTENER_NAME_INTERNAL_SASL_OAUTHBEARER_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT}
@@ -96,7 +80,6 @@ services:
 
       KAFKA_LISTENER_NAME_CONTROLLER_SASL_ENABLED_MECHANISMS: OAUTHBEARER
       KAFKA_LISTENER_NAME_CONTROLLER_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.confluent.kafka.server.plugins.auth.token.CompositeBearerValidatorCallbackHandler
-      #KAFKA_LISTENER_NAME_CONTROLLER_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler
       KAFKA_LISTENER_NAME_CONTROLLER_OAUTHBEARER_SASL_LOGIN_CALLBACK_HANDLER_CLASS: org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler
       KAFKA_LISTENER_NAME_CONTROLLER_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
       KAFKA_LISTENER_NAME_CONTROLLER_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
@@ -147,7 +130,8 @@ services:
       KAFKA_CONFLUENT_METADATA_SERVER_OAUTHBEARER_EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
       KAFKA_CONFLUENT_METADATA_SERVER_OAUTHBEARER_SUB_CLAIM_NAME: ${SUB_CLAIM_NAME}
       KAFKA_CONFLUENT_METADATA_SERVER_OAUTHBEARER_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
-      # Should only be required when configuring a secondary cluster which is supposed to access another MDS cluster (hosted by the primary cluster)
+
+      # The following should only be required when configuring a secondary cluster which is supposed to access another MDS cluster (hosted by the primary cluster)
       #KAFKA_CONFLUENT_METADATA_SECURITY_PROTOCOL: SASL_PLAINTEXT
       #KAFKA_CONFLUENT_METADATA_SASL_MECHANISM: OAUTHBEARER
       #KAFKA_CONFLUENT_METADATA_SASL_LOGIN_CALLBACK_HANDLER_CLASS: 'org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler'
@@ -157,10 +141,6 @@ services:
       #  clientId="${RP_CLIENT_ID}" \
       #  clientSecret="${RP_CLIENT_SECRET}" \
       #  scope="${AZURE_OAUTH_SCOPE}";
-
-      #KAFKA_CONFLUENT_METADATA_SERVER_SSL_TRUSTSTORE_LOCATION: /keys/truststore.jks
-      #KAFKA_CONFLUENT_METADATA_SERVER_SSL_TRUSTSTORE_TYPE: JKS
-      #KAFKA_CONFLUENT_METADATA_SERVER_SSL_TRUSTSTORE_PASSWORD: ${TRUSTSTORE_PASSWORD}
 
       # EmbeddedKafkaRest: Kafka Client Configuration (ONLY REQUIRED FOR STANDALONE REST PROXY)
       #KAFKA_KAFKA_CLIENT_BOOTSTRAP_SERVERS: SASL_PLAINTEXT://broker1:9092
@@ -179,9 +159,6 @@ services:
       KAFKA_KAFKA_REST_KAFKA_REST_RESOURCE_EXTENSION_CLASS: io.confluent.kafkarest.security.KafkaRestSecurityResourceExtension
       # See https://docs.confluent.io/platform/current/security/authentication/multi-protocol/authenticationhandler.html
       KAFKA_KAFKA_REST_REST_SERVLET_INITIALIZOR_CLASSES: io.confluent.common.security.jetty.initializer.AuthenticationHandler
-      # WRONG! Use previous lines
-      #KAFKA_KAFKA_REST_SERVLET_INITIALIZOR_CLASSES: io.confluent.rest.auth.security.AuthenticationHandler
-      #KAFKA_KAFKA_REST_AUTHENTICATION_METHOD: OAUTH
       KAFKA_KAFKA_REST_AUTHENTICATION_ROLES: "**"
       KAFKA_KAFKA_REST_OAUTHBEARER_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT}
       KAFKA_KAFKA_REST_OAUTHBEARER_EXPECTED_ISSUER: ${IDP_EXPECTED_ISSUER}
@@ -191,7 +168,6 @@ services:
       KAFKA_KAFKA_REST_PUBLIC_KEY_PATH: /keys/public.pem
 
       # EmbeddedKafkaRest: MDS Client configuration
-      KAFKA_REST_CONFLUENT_REST_AUTH_PROPAGATE_METHOD: JETTY_AUTH
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker1:8091
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: OAUTHBEARER
       KAFKA_KAFKA_REST_CONFLUENT_METADATA_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
@@ -204,8 +180,6 @@ services:
       KAFKA_KAFKA_REST_CLIENT_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
       KAFKA_KAFKA_REST_CLIENT_SASL_JAAS_CONFIG: |
         org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
-        unsecuredLoginStringClaim_sub="thePrincipalName" \
-        publicKeyPath="/keys/public.pem" \
         clientId="${AZURE_CP_APPLICATION_ID}" \
         clientSecret="${AZURE_CP_APPLICATION_SECRET}" \
         scope="${AZURE_OAUTH_SCOPE}";
@@ -321,8 +295,8 @@ services:
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker1:9092'
       SCHEMA_REGISTRY_GROUP_ID: schema-registry-demo
-      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
-      SCHEMA_REGISTRY_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=*'
+      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT'
+      SCHEMA_REGISTRY_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT'
 
       SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: OAUTHBEARER
       SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: SASL_PLAINTEXT
@@ -396,7 +370,7 @@ services:
       CONNECT_GROUP_ID: "connect-cluster"
       CONNECT_PRODUCER_CLIENT_ID: "connect-worker-producer"
       CONNECT_PRODUCER_ENABLE_IDEMPOTENCE: 'true'
-      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
+      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT'
 
       CONNECT_CONFIG_STORAGE_TOPIC: connect-configs
       CONNECT_OFFSET_STORAGE_TOPIC: connect-offsets
@@ -542,11 +516,11 @@ services:
       - "8088:8088"
       - "1238:1238"
     environment:
-      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
-      KSQL_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=${IDP_TOKEN_ENDPOINT},${IDP_JWKS_ENDPOINT},${IDP_EXPECTED_ISSUER}'
+      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT'
+      KSQL_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=${IDP_TOKEN_ENDPOINT},${IDP_JWKS_ENDPOINT}'
       CUB_CLASSPATH: '/usr/share/java/confluent-security/ksql/*:/usr/share/java/ksqldb-server/*:/usr/share/java/cp-base-new/*'
 
-      KSQL_LOG4J_ROOT_LOGLEVEL: DEBUG
+      KSQL_LOG4J_ROOT_LOGLEVEL: INFO
 
       KSQL_KSQL_SERVICE_ID: "ksql-cluster"
       KSQL_KSQL_STREAMS_REPLICATION_FACTOR: 1
@@ -678,8 +652,8 @@ services:
     environment:
       CUB_CLASSPATH: '/usr/share/java/confluent-control-center/*:/usr/share/java/rest-utils/*:/usr/share/java/confluent-common/*:/usr/share/java/confluent-security/kafka-rest/*:/usr/share/java/kafka-rest/:/usr/share/java/cp-base-new/*'
       EXTRA_ARGS: "-javaagent:/usr/bin/jmx/jmx_prometheus_javaagent-0.15.0.jar=1237:/usr/bin/jmx/exporter.yml"
-      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_EXPECTED_ISSUER,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
-      CONTROL_CENTER_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=*'
+      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT'
+      CONTROL_CENTER_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT'
 
       # If using Confluent Health+ for monitoring and alerting, uncomment the line below to run in management mode.
       # CONTROL_CENTER_MODE_ENABLE: "management"
