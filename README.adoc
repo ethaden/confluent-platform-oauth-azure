@@ -511,6 +511,27 @@ Show the topics:
 show topics;
 ```
 
+=== OpenLDAP
+
+The demo in subfolder `cluster-ldap-external-only-oidc` comes with an integrated OpenLDP server simulating active directory.
+
+The directory is pre-populated with some users and groups:
+
+* User: client, password: client
+* User: client2, password: client2
+* User client3, password client3
+
+Querying the directory can be done on the command line like this:
+
+```console
+ldapsearch -H ldap://localhost:389 -D cn=admin,dc=demo,dc=confluent,dc=io -b dc=demo,dc=confluent,dc=io -x -w admin
+```
+
+For easier management, `phpldapamin` is made available, too. Just point your browser to this address: http://localhost:8090.
+Credentials
+
+* Login DN: cn=admin,dc=demo,dc=confluent,dc=io
+* Password: admin
 
 
 === Troubleshooting
