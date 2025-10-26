@@ -11,21 +11,13 @@ LDAP_ADMIN_PASS="${4}"
 LDAP_CONFIG_PASS="${5}"
 LDAP_ADD="ldapadd -H ldap://${LDAP_HOST} -x -w ${LDAP_ADMIN_PASS} -D cn=admin,${LDAP_BASE_DN} -a -c -v -v"
 
-#echo "Enabling 'memberOf' overlay in LDAP"
-#ldapadd -H ldap://${LDAP_HOST} -x -w ${LDAP_CONFIG_PASS} -D cn=admin,cn=config -a -c -v -v<<EOF
-#dn: olcOverlay=memberof,olcDatabase={1}mdb,cn=config
-#objectClass: olcOverlayConfig
-#objectClass: olcMemberOf
-#olcOverlay: memberof
-#olcMemberOfRefint: TRUE
-#EOF
-
-# Configure access controls to allow read access to all entries
+echo "Enabling 'memberOf' overlay in LDAP"
 ldapadd -H ldap://${LDAP_HOST} -x -w ${LDAP_CONFIG_PASS} -D cn=admin,cn=config -a -c -v -v<<EOF
-dn: olcDatabase={1}mdb,cn=config
-changetype: modify
-add: olcAccess
-olcAccess: to * by * read
+dn: olcOverlay=memberof,olcDatabase={1}mdb,cn=config
+objectClass: olcOverlayConfig
+objectClass: olcMemberOf
+olcOverlay: memberof
+olcMemberOfRefint: TRUE
 EOF
 
 echo "Creating ou=groups in LDAP"
