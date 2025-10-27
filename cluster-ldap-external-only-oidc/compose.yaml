@@ -86,8 +86,8 @@ services:
     ports:
       - "9080:80"
     environment:
-      PHPLDAPADMIN_LDAP_HOSTS: "openldap"
       PHPLDAPADMIN_HTTPS: "false"
+      PHPLDAPADMIN_LDAP_HOSTS: "#PYTHON2BASH:[{'openldap': [{'server': [{'tls': False}]},{'login': [{'bind_id': 'cn=admin,${LDAP_BASE_DN}'}]}]}]"
 
   broker1:
     <<: *common-security
@@ -113,71 +113,69 @@ services:
       - "9096:9096" # MDS Token Issuer for exchanging IdP tokens or username+password for MDS-issued tokens
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:SASL_PLAINTEXT,INTERNAL:SASL_PLAINTEXT,EXTERNALOAUTH:SASL_PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://broker1:9092,CONTROLLER://broker1:9192,INTERNAL://broker1:9093,EXTERNALOAUTH://broker1:9095
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker1:9092,INTERNAL://broker1:9093,EXTERNALOAUTH://broker1:9095
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:SASL_PLAINTEXT,INTERNAL:SASL_PLAINTEXT,EXTERNALOAUTH:SASL_PLAINTEXT,TOKEN:SASL_PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://broker1:9092,CONTROLLER://broker1:9192,INTERNAL://broker1:9093,EXTERNALOAUTH://broker1:9095,TOKEN://broker1:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker1:9092,INTERNAL://broker1:9093,EXTERNALOAUTH://broker1:9095,TOKEN://broker1:9094
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_PROCESS_ROLES: 'broker,controller'
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@broker1:9192'
       #,2@broker2:9192,3@broker3:9192'
-      KAFKA_SASL_MECHANISM_CONTROLLER_PROTOCOL: PLAIN
+      KAFKA_SASL_MECHANISM_CONTROLLER_PROTOCOL: OAUTHBEARER
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
       CLUSTER_ID: ${CLUSTER_ID}
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_SUPER_USERS: User:admin;User:$SUPERUSER_PRINCIPAL_ID
       KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
-      KAFKA_LOG4J_LOGGERS: "kafka.authorizer.logger=INFO,io.confluent.rest-utils=DEBUG,io.confluent.rbacapi=INFO,io.confluent.tokenapi=INFO,io.confluent.security.auth=INFO,io.confluent.security.store=INFO,io.confluent.common.security.jetty=INFO"
-      #KAFKA_LOG4J_LOGGERS: "io.confluent.security.auth.provider.ldap.LdapAuthenticateCallbackHandler=TRACE,io.confluent.security.auth.provider.ldap.LdapGroupManager=TRACE"
-      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+      KAFKA_LOG4J_LOGLEVEL: INFO
+      #KAFKA_LOG4J_LOGGERS: "kafka.authorizer.logger=DEBUG,io.confluent.rest-utils=DEBUG,io.confluent.rbacapi=DEBUG,io.confluent.tokenapi=DEBUG,io.confluent.security.auth=DEBUG,io.confluent.security.store=DEBUG,io.confluent.common.security.jetty=DEBUG"
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: OAUTHBEARER
       KAFKA_SASL_ENABLED_MECHANISMS: PLAIN, OAUTHBEARER
-      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT,$IDP_AUTHORIZATION_ENDPOINT,$IDP_DEVICE_AUTHORIZATION_ENDPOINT'
+      KAFKA_OPTS: '-Dorg.apache.kafka.sasl.oauthbearer.allowed.urls=$IDP_TOKEN_ENDPOINT,$IDP_JWKS_ENDPOINT'
 
-      # For Port 9092, we support just username+password authentication
-      KAFKA_LISTENER_NAME_PLAINTEXT_SASL_ENABLED_MECHANISMS: PLAIN
-      KAFKA_LISTENER_NAME_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG: |
-        org.apache.kafka.common.security.plain.PlainLoginModule required \
-        username="admin" \
-        password="admin-secret" \
-        user_admin="admin-secret" \
-        user_client="client-secret";
+      KAFKA_LISTENER_NAME_INTERNAL_SASL_ENABLED_MECHANISMS: OAUTHBEARER
+      KAFKA_LISTENER_NAME_INTERNAL_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.confluent.kafka.server.plugins.auth.token.CompositeBearerValidatorCallbackHandler
+      KAFKA_LISTENER_NAME_INTERNAL_OAUTHBEARER_SASL_LOGIN_CALLBACK_HANDLER_CLASS: org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler
+      KAFKA_LISTENER_NAME_INTERNAL_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
+      # Required for RBAC
+      KAFKA_LISTENER_NAME_INTERNAL_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
+      KAFKA_LISTENER_NAME_INTERNAL_SASL_OAUTHBEARER_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT}
+      KAFKA_LISTENER_NAME_INTERNAL_SASL_OAUTHBEARER_EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
+      KAFKA_LISTENER_NAME_INTERNAL_SASL_OAUTHBEARER_SUB_CLAIM_NAME: ${SUB_CLAIM_NAME}
+      KAFKA_LISTENER_NAME_INTERNAL_OAUTHBEARER_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
+      # Note: the 'unsecuredLoginStringClaim_sub="thePrincipalName"' is currently required for listeners when using RBAC in Confluent Platform for handling MDS-issued tokens.
+      # It might be removed in future versions.
+      # Explanation: The following JAAS configuration is used for the listener that accepts OAUTHBEARER tokens for internal Kafka broker communication as well as for those internal clients which connects to the internal broker listener.
+      # Therefore we need to specify clientId and clientSecret of the Confluent Platform Application Registration here, to allow those internal clients to successfully authenticate to EntraID.
+      KAFKA_LISTENER_NAME_INTERNAL_OAUTHBEARER_SASL_JAAS_CONFIG: |
+        org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+        unsecuredLoginStringClaim_sub="thePrincipalName" \
+        publicKeyPath="/keys/public.pem" \
+        clientId="${AZURE_CP_APPLICATION_ID}" \
+        clientSecret="${AZURE_CP_APPLICATION_SECRET}" \
+        scope="${AZURE_OAUTH_SCOPE}";
 
-      # For inter-broker communication on Port 9093, we support just username+password authentication
-      KAFKA_LISTENER_NAME_INTERNAL_SASL_ENABLED_MECHANISMS: PLAIN
-      KAFKA_LISTENER_NAME_INTERNAL_PLAIN_SASL_JAAS_CONFIG: |
-        org.apache.kafka.common.security.plain.PlainLoginModule required \
-        username="admin" \
-        password="admin-secret" \
-        user_admin="admin-secret" \
-        user_mds="mds-secret";
+      KAFKA_LISTENER_NAME_CONTROLLER_SASL_ENABLED_MECHANISMS: OAUTHBEARER
+      KAFKA_LISTENER_NAME_CONTROLLER_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.confluent.kafka.server.plugins.auth.token.CompositeBearerValidatorCallbackHandler
+      KAFKA_LISTENER_NAME_CONTROLLER_OAUTHBEARER_SASL_LOGIN_CALLBACK_HANDLER_CLASS: org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler
+      KAFKA_LISTENER_NAME_CONTROLLER_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
+      KAFKA_LISTENER_NAME_CONTROLLER_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
+      KAFKA_LISTENER_NAME_CONTROLLER_SASL_OAUTHBEARER_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT}
+      KAFKA_LISTENER_NAME_CONTROLLER_SASL_OAUTHBEARER_EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
+      KAFKA_LISTENER_NAME_CONTROLLER_SASL_OAUTHBEARER_SUB_CLAIM_NAME: ${SUB_CLAIM_NAME}
+      KAFKA_LISTENER_NAME_CONTROLLER_OAUTHBEARER_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
+      # Note: the 'unsecuredLoginStringClaim_sub="thePrincipalName"' is currently required for listeners when using RBAC in Confluent Platform for handling MDS-issued tokens.
+      # It might be removed in future versions.
+      # Explanation: The following JAAS configuration is used for the listener that accepts OAUTHBEARER tokens for Kafka Controller communication as well as for the internal clients which connects to the controller listener.
+      # Therefore we need to specify clientId and clientSecret of the Confluent Platform Application Registration here, to allow those internal clients to successfully authenticate to EntraID.
+      KAFKA_LISTENER_NAME_CONTROLLER_OAUTHBEARER_SASL_JAAS_CONFIG: |
+        org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+        unsecuredLoginStringClaim_sub="thePrincipalName" \
+        publicKeyPath="/keys/public.pem" \
+        clientId="${AZURE_CP_APPLICATION_ID}" \
+        clientSecret="${AZURE_CP_APPLICATION_SECRET}" \
+        scope="${AZURE_OAUTH_SCOPE}";
 
-      # For controller communication on Port 9192, we support just username+password authentication
-      KAFKA_LISTENER_NAME_CONTROLLER_SASL_ENABLED_MECHANISMS: PLAIN
-      KAFKA_LISTENER_NAME_CONTROLLER_PLAIN_SASL_JAAS_CONFIG: |
-        org.apache.kafka.common.security.plain.PlainLoginModule required \
-        username="admin" \
-        password="admin-secret" \
-        user_admin="admin-secret" \
-        user_mds="mds-secret";
-
-      ############################# Token Listener Settings #############################
-      # This is used by MDS and allows providing either an IdP token or username+password in order to get a token back which is issued by the MDS token issuer service
-      #KAFKA_LISTENER_NAME_TOKEN_SASL_ENABLED_MECHANISMS: OAUTHBEARER,PLAIN
-      #KAFKA_LISTENER_NAME_TOKEN_SASL_ENABLED_MECHANISMS: PLAIN
-      #KAFKA_LISTENER_NAME_TOKEN_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.confluent.kafka.server.plugins.auth.token.TokenBearerServerLoginCallbackHandler
-      #KAFKA_LISTENER_NAME_TOKEN_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.confluent.kafka.server.plugins.auth.token.TokenBearerValidatorCallbackHandler
-      #KAFKA_LISTENER_NAME_TOKEN_PLAIN_SASL_JAAS_CONFIG: |
-      #  org.apache.kafka.common.security.plain.PlainLoginModule required \
-      #  username="admin" \
-      #  password="admin-secret" \
-      #  user_admin="admin-secret" \
-      #  user_mds="mds-secret";
-      #listener.name.token.oauthbearer.sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required publicKeyPath="/var/ssl/private/public.pem";
-      #listener.name.token.oauthbearer.sasl.login.callback.handler.class=io.confluent.kafka.server.plugins.auth.token.TokenBearerServerLoginCallbackHandler
-      #listener.name.token.oauthbearer.sasl.server.callback.handler.class=io.confluent.kafka.server.plugins.auth.token.TokenBearerValidatorCallbackHandler
-      #listener.name.token.principal.builder.class=io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
-      #listener.name.token.sasl.enabled.mechanisms=OAUTHBEARER
-
-      # Configure OAuth Token listener for external tokens (from IdP)
+      # Configure OAuth Token listener
       KAFKA_LISTENER_NAME_EXTERNALOAUTH_SASL_ENABLED_MECHANISMS: OAUTHBEARER
       KAFKA_LISTENER_NAME_EXTERNALOAUTH_OAUTHBEARER_SASL_SERVER_CALLBACK_HANDLER_CLASS: io.confluent.kafka.server.plugins.auth.token.CompositeBearerValidatorCallbackHandler
       KAFKA_LISTENER_NAME_EXTERNALOAUTH_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
@@ -208,7 +206,7 @@ services:
       KAFKA_CONFLUENT_METADATA_SERVER_ADVERTISED_LISTENERS: http://broker1:8090
       KAFKA_CONFLUENT_METADATA_SERVER_TOKEN_KEY_PATH: /keys/keypair.pem
       KAFKA_CONFLUENT_METADATA_SERVER_OPENAPI_ENABLE: 'true'
-      # Use MDS without LDAP, OAuth token is required
+      # Use MDS with both OAUTHBEARER and LDAP.
       KAFKA_CONFLUENT_METADATA_SERVER_USER_STORE: LDAP_WITH_OAUTH
       KAFKA_CONFLUENT_METADATA_SERVER_OAUTHBEARER_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT}
       KAFKA_CONFLUENT_METADATA_SERVER_OAUTHBEARER_EXPECTED_ISSUER: ${IDP_EXPECTED_ISSUER}
@@ -218,9 +216,9 @@ services:
 
       # LDAP
       KAFKA_LDAP_JAVA_NAMING_PROVIDER_URL: ldap://openldap:389
-      KAFKA_LDAP_JAVA_NAMING_SECURITY_PRINCIPAL: "cn=readonly,dc=demo,dc=confluent,dc=io"
+      KAFKA_LDAP_JAVA_NAMING_SECURITY_PRINCIPAL: "cn=${LDAP_READONLY_USER_USERNAME},${LDAP_BASE_DN}"
       # Password of user
-      KAFKA_LDAP_JAVA_NAMING_SECURITY_CREDENTIALS: "readonly"
+      KAFKA_LDAP_JAVA_NAMING_SECURITY_CREDENTIALS: "${LDAP_READONLY_USER_PASSWORD}"
       KAFKA_LDAP_JAVA_NAMING_SECURITY_AUTHENTICATION: "simple"
       KAFKA_LDAP_SEARCH_MODE: "GROUPS"
       KAFKA_LDAP_USER_SEARCH_BASE: "ou=users,dc=demo,dc=confluent,dc=io"
@@ -335,15 +333,15 @@ services:
       KAFKA_CONFLUENT_CONSUMER_LAG_EMITTER_ENABLED: "true"
 
       # LICENSE
-      KAFKA_CONFLUENT_LICENSE_SECURITY_PROTOCOL: SASL_PLAINTEXT
-      KAFKA_CONFLUENT_LICENSE_SASL_MECHANISM: PLAIN
+      #KAFKA_CONFLUENT_LICENSE_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      #KAFKA_CONFLUENT_LICENSE_SASL_MECHANISM: PLAIN
       #KAFKA_CONFLUENT_LICENSE_SASL_LOGIN_CALLBACK_HANDLER_CLASS: 'org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler'
-      KAFKA_CONFLUENT_LICENSE_SASL_LOGIN_CALLBACK_HANDLER_CLASS: io.confluent.kafka.clients.plugins.auth.token.TokenUserLoginCallbackHandler
-      KAFKA_CONFLUENT_LICENSE_LICENSE_SASL_JAAS_CONFIG: |
-        org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
-        username="admin" \
-        password="admin" \
-        metadataServerUrls="http://broker1:8090";
+      #KAFKA_CONFLUENT_LICENSE_SASL_LOGIN_CALLBACK_HANDLER_CLASS: io.confluent.kafka.clients.plugins.auth.token.TokenUserLoginCallbackHandler
+      #KAFKA_CONFLUENT_LICENSE_LICENSE_SASL_JAAS_CONFIG: |
+      #  org.apache.kafka.common.security.plain.PlainLoginModule required \
+      #  username="admin" \
+      #  password="admin" \
+      #  metadataServerUrls="http://broker1:8090";
       #KAFKA_CONFLUENT_LICENSE_SASL_OAUTHBEARER_TOKEN_ENDPOINT_URL: ${IDP_TOKEN_ENDPOINT}
       #KAFKA_CONFLUENT_LICENSE_OIDC_IDP_SUB_CLAIM_NAME: ${SUB_CLAIM_NAME}
       #KAFKA_CONFLUENT_LICENSE_OIDC_IDP_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
@@ -366,6 +364,10 @@ services:
       #username="...." \
       #password="...." \
       #metadataServerUrls="....";
+      LDAP_BASE_DN: "${LDAP_BASE_DN:-dc=demo,dc=confluent,dc=io}"
+      LDAP_READONLY_USER_USERNAME: "${LDAP_READONLY_USER_USERNAME:-readonly}"
+      LDAP_READONLY_USER_PASSWORD: "${LDAP_READONLY_USER_PASSWORD:-readonly}"
+
 
     volumes:
       - ./keys:/keys

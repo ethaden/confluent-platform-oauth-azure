@@ -1,7 +1,11 @@
+x-common-security: &common-security
+  security_opt:
+    - no-new-privileges:true
+
 services:
 
   init_certificates:
-    #image: alpine/openssl
+    <<: *common-security
     image: ${DOCKER_REGISTRY}confluentinc/cp-server:${CONFLUENT_DOCKER_TAG:-latest}
     container_name: init_certificates
     volumes:
@@ -24,6 +28,7 @@ services:
         condition: none
 
   broker1:
+    <<: *common-security
     image: ${DOCKER_REGISTRY}confluentinc/cp-server:${CONFLUENT_DOCKER_TAG:-latest}
     hostname: broker1
     container_name: broker1
@@ -251,6 +256,7 @@ services:
     command: "bash -c 'if [ ! -f /keys/keypair.pem ]; then echo \"ERROR: Did you forget the create-certificates.sh file that came with this docker-compose.yml file?\" && exit 1 ; else /etc/confluent/docker/run ; fi'"
 
   init_permissions:
+    <<: *common-security
   # Just use the cp-server image as it has the curl command
     image: ${DOCKER_REGISTRY}confluentinc/cp-server:${CONFLUENT_DOCKER_TAG:-latest}
     container_name: init_permissions
@@ -281,6 +287,7 @@ services:
         condition: none
 
   schema-registry:
+    <<: *common-security
     image: ${DOCKER_REGISTRY}confluentinc/cp-schema-registry:${CONFLUENT_DOCKER_TAG:-latest}
     hostname: schema-registry
     container_name: schema-registry
@@ -347,6 +354,7 @@ services:
       SCHEMA_REGISTRY_CONFLUENT_METADATA_OAUTHBEARER_LOGIN_OAUTH_SCOPE: ${AZURE_OAUTH_SCOPE}
 
   connect:
+    <<: *common-security
     container_name: connect
     hostname: connect
     build:
@@ -512,6 +520,7 @@ services:
                   -XX:MaxInlineLevel=15 -Djava.awt.headless=true
 
   ksqldb-server:
+    <<: *common-security
     image: ${DOCKER_REGISTRY}confluentinc/cp-ksqldb-server:${CONFLUENT_DOCKER_TAG:-latest}
     hostname: ksqldb-server
     container_name: ksqldb-server
@@ -605,6 +614,7 @@ services:
       #  scope="${AZURE_OAUTH_SCOPE}";
 
   c3prometheus:
+    <<: *common-security
     image: confluentinc/cp-enterprise-prometheus:2.2.0
     hostname: cp-enterprise-prometheus
     container_name: c3prometheus
@@ -617,6 +627,7 @@ services:
       SHOULD_LOG_TO_FILE: false
 
   c3_alertmanager:
+    <<: *common-security
     image: confluentinc/cp-enterprise-alertmanager:2.2.0
     hostname: cp-enterprise-alertmanager
     container_name: alertmanager
@@ -631,6 +642,7 @@ services:
       SHOULD_LOG_TO_FILE: false
 
   control-center:
+    <<: *common-security
     image: ${DOCKER_REGISTRY}confluentinc/cp-enterprise-control-center-next-gen:2.2.0
     hostname: control-center
     container_name: control-center
@@ -756,6 +768,7 @@ services:
       CONTROL_CENTER_ALERTMANAGER_CONFIG_FILE: /mnt/config/alertmanager-generated.yml
 
   prometheus:
+    <<: *common-security
     image: prom/prometheus
     hostname: prometheus
     container_name: prometheus
@@ -769,6 +782,7 @@ services:
     command: --web.listen-address=:9990 --config.file=/etc/prometheus/prometheus.yml
 
   grafana:
+    <<: *common-security
     image: grafana/grafana
     hostname: grafana
     container_name: grafana
