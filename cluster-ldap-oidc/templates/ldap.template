@@ -1,0 +1,7 @@
+sasl.mechanism=PLAIN
+security.protocol=SASL_PLAINTEXT
+group.id=console-consumer-group-ldap
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${USERNAME}" password="${PASSWORD}";
+schema.registry.url=http://schema-registry:8081
+basic.auth.credentials.source=USER_INFO
+basic.auth.user.info=${USERNAME}:${PASSWORD}
