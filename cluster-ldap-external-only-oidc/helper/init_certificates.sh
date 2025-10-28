@@ -47,19 +47,33 @@ fi
 
 create_kafka_oauthbearer_config () {
 cat > $1 <<EOF
-    sasl.mechanism=OAUTHBEARER
-    security.protocol=SASL_PLAINTEXT
-    group.id=console-consumer-group
-    sasl.login.callback.handler.class=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler
-    sasl.oauthbearer.token.endpoint.url=$2
-    sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \\
-      clientId="$3" \\
-      clientSecret="$4" \\
-      scope="$5";
+sasl.mechanism=OAUTHBEARER
+security.protocol=SASL_PLAINTEXT
+group.id=console-consumer-group
+sasl.login.callback.handler.class=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginCallbackHandler
+sasl.oauthbearer.token.endpoint.url=$2
+sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \\
+    clientId="$3" \\
+    clientSecret="$4" \\
+    scope="$5";
+schema.registry.url=http://schema-registry:8081
 EOF
 }
 
+create_kafka_ldap_config () {
+cat > $1 <<EOF
+sasl.mechanism=PLAIN
+security.protocol=SASL_PLAINTEXT
+group.id=console-consumer-group-ldap
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${2}" password="${3}";
+schema.registry.url=http://schema-registry:8081
+basic.auth.credentials.source=USER_INFO
+basic.auth.user.info=${2}:${3}
+EOF
+}
+
+
 echo "Creating client files"
 create_kafka_oauthbearer_config /mount/superuser.properties "$IDP_TOKEN_ENDPOINT" "$SUPERUSER_CLIENT_ID" "$SUPERUSER_CLIENT_SECRET" "$AZURE_OAUTH_SCOPE"
-create_kafka_oauthbearer_config /mount/client.properties "$IDP_TOKEN_ENDPOINT" "$CLIENT_APP_ID" "$CLIENT_APP_SECRET" "$AZURE_OAUTH_SCOPE"
+create_kafka_ldap_config /mount/client-ldap.properties "${LDAP_CLIENT_USERNAME}" "${LDAP_CLIENT_PASSWORD}"
 exit 0

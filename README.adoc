@@ -86,13 +86,13 @@ Add the container names in your local DNS for ease of usages of commands describ
 
 Edit the `/etc/hosts` file which will require elevated privileges. E.g., to edit with `vi` on a `sudo`-enabled system:
 
-```shell
+```console
 sudo vi /etc/hosts
 ``` 
 
 Add these lines at the end of the file:
 
-```shell
+```console
 127.0.0.1       broker1
 127.0.0.1       schema-registry
 127.0.0.1       connect
@@ -102,7 +102,7 @@ Add these lines at the end of the file:
 
 If you are using IPv6, you might need to add these additional lines:
 
-```shell
+```console
 ::1       broker
 ::1       schema-registry
 ::1       connect
@@ -119,7 +119,7 @@ Go the the `cluster...` folder, copy the `.env-template` to `.env` and customize
 
 To initialise the environment, you can either call `docker compose up -d` or use the provided start script:
 
-```shell
+```console
 ./start.sh
 ```
 
@@ -134,13 +134,15 @@ This will:
 
 If you need access tokens for the vaious service users for testing, please have a look at the `helper/set_user_tokens.sh`. It will acquire tokens for you. Just source it:
 
-```shell
+```console
 source helper/set_user_tokens.sh
 ```
    
 === Produce and Consume to Kafka using OAuth from Broker
 
-```shell
+Based on your customizations in the `.env` file, the `client`  EntraID user you have specified should have access to produce and consume messages from topics starting with `test`.
+
+```console
 docker compose exec broker1 kafka-console-producer \
     --bootstrap-server broker1:9092 \
     --topic test \
@@ -157,7 +159,7 @@ docker compose exec broker1 kafka-console-consumer \
 
 Let's try to create a new topic as user `client`. 
 
-```shell
+```console
 docker compose exec broker1 kafka-topics \
     --bootstrap-server broker1:9092 \
     --create \
@@ -169,112 +171,157 @@ This should work as there is an RBAC role granting ResourceOwner to all topics s
 
 Try to create another topic:
 
-```shell
+```console
 docker compose exec broker1 kafka-topics \
     --bootstrap-server broker1:9092 \
+    --create \
     --topic abcde \
-    --command-config /etc/confluent/configs/superuser.properties
+    --command-config /etc/confluent/configs/client.properties
 ```
 
 This should fail.
+
+However, the superuser is allowed to do that:
+
+```console
+docker compose exec broker1 kafka-topics \
+    --bootstrap-server broker1:9092 \
+    --create \
+    --topic abcde \
+    --command-config /etc/confluent/configs/superuser.properties
+```
 
 
 === Schema Registry RBAC using OAuth
 
 All Schema Registry endpoints should be accessible with OAuth token.
 
-List available schemas on the cluster: The `$SCHEMA_REGISTRY_ACCESS_TOKEN` would be available in the current shell. If it's not available or is expired please rerun the command below.  
-<details open>
-  <summary>Get Schema Registry client access token</summary> 
+List available schemas on the cluster: The `$SCHEMA_REGISTRY_ACCESS_TOKEN` would be available in the current shell. If it's not available or is expired please rerun the command below. 
 
-```shell
-export SCHEMA_REGISTRY_ACCESS_TOKEN=$(curl -s\
-    -d "client_id=sr_client_app" \
-    -d "client_secret=sr_client_app_secret" \
-    -d "grant_type=client_credentials" \
-    http://keycloak:8080/realms/cp/protocol/openid-connect/token | jq -r .access_token)
+```console
+source helper/set_user_tokens.sh
 ```
-</details>
+
+
 
 ==== Ensure the token is valid
-This should return the available schema types
+This should return the available schema types:
 
-```curl -H "Authorization: Bearer $SCHEMA_REGISTRY_ACCESS_TOKEN" http://localhost:8081/schemas/types```
+```console
+curl -H "Authorization: Bearer $SCHEMA_REGISTRY_ACCESS_TOKEN" http://localhost:8081/schemas/types
+```
 
 ==== Produce and Consume using Schema Registry
 
-2. Use `kafka-avro-console-producer` to produce to a Kafka topic using Schema ID Validation:
+Use `kafka-avro-console-producer` to produce to a Kafka topic using Schema ID Validation:
 The required client config file is already mounted to the containers.
 
-```shell
-docker exec -it schema-registry /bin/bash
-```
-
-```shell
- kafka-avro-console-producer \
-  --bootstrap-server broker:9092 \
+```console
+kafka-avro-console-producer \
+  --bootstrap-server broker1:9092 \
   --property bearer.auth.credentials.source=OAUTHBEARER \
-  --property bearer.auth.issuer.endpoint.url=http://keycloak:8080/realms/cp/protocol/openid-connect/token \
-  --property bearer.auth.client.id=client_app1 \
-  --property bearer.auth.client.secret=client_app1_secret \
-  --producer.config /etc/confluent/configs/client.properties \
-  --topic test-topic \
+  --property bearer.auth.issuer.endpoint.url=$IDP_TOKEN_ENDPOINT  \
+  --property bearer.auth.client.id=$CLIENT_APP_ID \
+  --property bearer.auth.client.secret=$CLIENT_APP_SECRET \
+  --property bearer.auth.scope=$AZURE_OAUTH_SCOPE  \
+  --producer.config mount/client.properties \
+  --topic test-avro \
   --property value.schema='{"type":"record","name":"Transaction","fields":[{"name":"id","type":"string"},{"name": "amount", "type": "double"}]}'
-
 ```
+
+If you do not have the `kafka-avro-console-producer` locally, you can also run it from the `schema-registry` container (but expect to see lots of logs in the output):
+
+```console
+docker compose exec schema-registry kafka-avro-console-producer \
+  --bootstrap-server broker1:9092 \
+  --property bearer.auth.credentials.source=OAUTHBEARER \
+  --property bearer.auth.issuer.endpoint.url=$IDP_TOKEN_ENDPOINT  \
+  --property bearer.auth.client.id=$CLIENT_APP_ID \
+  --property bearer.auth.client.secret=$CLIENT_APP_SECRET \
+  --property bearer.auth.scope=$AZURE_OAUTH_SCOPE  \
+  --producer.config /etc/confluent/configs/client.properties \
+  --topic test-avro \
+  --property value.schema='{"type":"record","name":"Transaction","fields":[{"name":"id","type":"string"},{"name": "amount", "type": "double"}]}'
+```
+
+Short form (here, the OIDC settings are passed using producer config):
+
+```console
+docker compose exec schema-registry kafka-avro-console-producer \
+  --bootstrap-server broker1:9092 \
+  --producer.config /etc/confluent/configs/client.properties \
+  --topic test-avro \
+  --property value.schema='{"type":"record","name":"Transaction","fields":[{"name":"id","type":"string"},{"name": "amount", "type": "double"}]}'
+```
+
 
 Here we are:
 
 * Passing Schema Registry client OAuth configs using bearer prefix.
 * Passing Kafka client related configs using `producer.config`.
 
-The producer will wait at the command prompt for data to be supplied. You can provide JSON strings in separate lines
+The producer will wait at the command prompt for data to be supplied. You can provide JSON strings in separate lines:
 
-   ```json
-   {"id": "1", "amount": 101}
-   {"id": "2", "amount": 102}
-   ```
+```json
+{"id": "1", "amount": 101}
+{"id": "2", "amount": 102}
+```
 
-3. Use `kafka-avro-console-consumer` to consume from the topic:
+Now, use `kafka-avro-console-consumer` to consume from the topic:
 
-    ```console
-    kafka-avro-console-consumer \
-   --bootstrap-server broker:9092 \
-   --property bearer.auth.credentials.source=OAUTHBEARER \
-   --property bearer.auth.issuer.endpoint.url=http://keycloak:8080/realms/cp/protocol/openid-connect/token \
-   --property bearer.auth.client.id=client_app1 \
-   --property bearer.auth.client.secret=client_app1_secret \
-   --topic test-topic \
-   --from-beginning \
-   --property print.key=true \
-   --consumer.config /etc/confluent/configs/client.properties
-    ```
+```console
+kafka-avro-console-consumer \
+    --bootstrap-server broker1:9092 \
+    --property bearer.auth.credentials.source=OAUTHBEARER \
+    --property bearer.auth.issuer.endpoint.url=$IDP_TOKEN_ENDPOINT  \
+    --property bearer.auth.client.id=$CLIENT_APP_ID \
+    --property bearer.auth.client.secret=$CLIENT_APP_SECRET \
+    --property bearer.auth.scope=$AZURE_OAUTH_SCOPE  \
+    --topic test-avro \
+    --from-beginning \
+    --property print.key=true \
+    --consumer.config mount/client.properties
+```
 
-=== Connect RBAC using OAuth
+If you do not have the `kafka-avro-console-consumer` locally, you can also run it from the `schema-registry` container (but expect to see lots of logs in the output):
+
+```console
+docker compose exec schema-registry kafka-avro-console-consumer \
+    --bootstrap-server broker1:9092 \
+    --property bearer.auth.credentials.source=OAUTHBEARER \
+    --property bearer.auth.issuer.endpoint.url=$IDP_TOKEN_ENDPOINT  \
+    --property bearer.auth.client.id=$CLIENT_APP_ID \
+    --property bearer.auth.client.secret=$CLIENT_APP_SECRET \
+    --property bearer.auth.scope=$AZURE_OAUTH_SCOPE  \
+    --topic test-avro \
+    --from-beginning \
+    --property print.key=true \
+    --consumer.config /etc/confluent/configs/client.properties
+```
+
+=== Get a temporary (!) access token manually
 
 All the endpoints are accessible using OAuth token.
 
-<details open>
-  <summary>Get Client App access token</summary> 
-
-```shell
+```console
 export CLIENT_APP_ACCESS_TOKEN=$(curl -s \
       -d "client_id=$CLIENT_APP_ID" \
       -d "client_secret=$CLIENT_APP_SECRET" \
       -d "grant_type=client_credentials" \
       $IDP_TOKEN_ENDPOINT | jq -r .access_token)
 ```
-</details>
 
 ==== List available connectors:
 
-```curl -H "Authorization: Bearer $CLIENT_APP_ACCESS_TOKEN" http://localhost:8083/connector-plugins/```
+```console
+curl -H "Authorization: Bearer $CLIENT_APP_ACCESS_TOKEN" http://localhost:8083/connector-plugins/
+```
 
 === Connector example using OAuth
 
 1. Create datagen source Connector :
 
-```shell
+```console
     curl --location 'localhost:8083/connectors' \
     --header 'Content-Type: application/json' \
       --header "Authorization: Bearer $CLIENT_APP_ACCESS_TOKEN" \
@@ -293,7 +340,7 @@ export CLIENT_APP_ACCESS_TOKEN=$(curl -s \
 
 2. Login to Confluent Control Center to validate messages being produced to topic `test-topic-datagen`, use credentials `c3superuser` and `c3superuser` to login to C3 using SSO.
 3. Alternatively, you can start a consumer in the broker container to see the messages getting produced
-```shell
+```console
 docker exec -it broker1 /bin/bash
 ```
 ```console
@@ -315,7 +362,7 @@ All the endpoints are accessible using OAuth token
 <details open>
   <summary>Get Client App access token</summary> 
 
-```shell
+```console
 export KSQL_ACCESS_TOKEN=$(curl -s \
    -d "client_id=ksql_client_app" \
    -d "client_secret=ksql_client_app_secret" \
@@ -327,7 +374,7 @@ export KSQL_ACCESS_TOKEN=$(curl -s \
 
 ==== Ensure token is valid and the ksqlDB service is running fine
 
-```shell
+```console
 curl --http1.1 \
      -X "GET" "http://ksqldb-server:8088/info" \
      -H "Accept: application/vnd.ksql.v1+json" \
@@ -337,7 +384,7 @@ curl --http1.1 \
 
 The output should include the `KsqlServerInfo` object, which should include the version, Kafka cluster ID, ksql service ID, and server status. For example:
 
-```shell
+```console
 {
   "KsqlServerInfo": {
     "version": "7.8.0-0",
@@ -352,7 +399,7 @@ The output should include the `KsqlServerInfo` object, which should include the 
 
 1. Creating a stream
 
-```shell
+```console
 curl --http1.1 \
      -X "POST" "http://ksqldb-server:8088/ksql" \
      -H "Accept: application/vnd.ksql.v1+json" \
@@ -368,7 +415,7 @@ The JSON output should include the `ABC` stream
 
 2. Executing `LIST STREAMS;`
 
-```shell
+```console
 curl --http1.1 \
      -X "POST" "http://ksqldb-server:8088/ksql" \
      -H "Accept: application/vnd.ksql.v1+json" \
@@ -383,7 +430,7 @@ The JSON output should list all the streams, the `KSQL_PROCESSING_LOG` and `ABC`
 
 3. Executing a Query
 
-```shell
+```console
 curl --http1.1 \
   -X "POST" "http://ksqldb-server:8088/query" \
   -H "Accept: application/vnd.ksql.v1+json" \
@@ -533,6 +580,91 @@ Credentials
 * Login DN: cn=admin,dc=demo,dc=confluent,dc=io
 * Password: admin
 
+==== Producing and consuming using LDAP authentication
+
+When using the configuration found in `cluster-ldap-external-only-oidc`, you can produce and consume messages using LDAP authentication and addition to using OIDC/OAuth.
+Note, that the Kafka cluster uses OAuth for all internal communication in that case, too.
+
+There is an additional Kafka endpoint with LDAP authentication enabled:
+
+```
+kafka:9095
+```
+
+All REST services support multiple authentication mechanisms, too.
+
+A config file has been generated in the `mount` sub folder and made available in the broker container.
+You can use the following commands to produce to and consume from a topic called test (or any other topic starting with `test`):
+
+```console
+docker compose exec broker1 kafka-console-producer \
+    --bootstrap-server broker1:9095 \
+    --topic test \
+    --producer.config /etc/confluent/configs/client-ldap.properties
+
+docker compose exec broker1 kafka-console-consumer \
+    --bootstrap-server broker1:9095 \
+    --from-beginning \
+    --topic test \
+    --consumer.config /etc/confluent/configs/client-ldap.properties
+```
+
+The REST Proxy services work with LDAP authentication, too. For example, querying the number of topics visible to the `client` user can be done like this:
+
+```console
+curl -u client:client --silent -X GET http://localhost:8090/kafka/v3/clusters/$CLUSTER_ID/topics
+```
+
+==== LDAP with Schema Registry
+
+Produce some data in AVRO format:
+
+```console
+kafka-avro-console-producer \
+  --bootstrap-server broker1:9095 \
+  --producer.config mount/client-ldap.properties \
+  --topic test-avro \
+  --property value.schema='{"type":"record","name":"Transaction","fields":[{"name":"id","type":"string"},{"name": "amount", "type": "double"}]}'
+```
+
+If you do not have the `kafka-avro-console-producer` locally, you can also run it from the `schema-registry` container (but expect to see lots of logs in the output):
+
+```console
+docker compose exec schema-registry kafka-avro-console-producer \
+  --bootstrap-server broker1:9095 \
+  --producer.config mount/client-ldap.properties \
+  --topic test-avro \
+  --property value.schema='{"type":"record","name":"Transaction","fields":[{"name":"id","type":"string"},{"name": "amount", "type": "double"}]}'
+```
+
+You can use these JSON strings as input:
+
+```json
+{"id": "3", "amount": 103}
+{"id": "4", "amount": 104}
+```
+
+Now consume the data again:
+
+```console
+kafka-avro-console-consumer \
+    --bootstrap-server broker1:9095 \
+    --topic test-avro \
+    --from-beginning \
+    --property print.key=true \
+    --consumer.config mount/client-ldap.properties
+```
+
+Again, the command can also be run from the `schema-registry` container:
+
+```console
+docker compose exec schema-registry kafka-avro-console-consumer \
+    --bootstrap-server broker1:9095 \
+    --topic test-avro \
+    --from-beginning \
+    --property print.key=true \
+    --consumer.config /etc/confluent/configs/client-ldap.properties
+```
 
 === Troubleshooting
 
@@ -541,20 +673,20 @@ When done playing around shut down the containers
 
 * Get the logs of a service
 
-```shell 
+```console 
 docker compose logs -f <container name>
 ```
 
 * Remove a single container. This will remove container and all logs. This will not delete the cached image
 
-```shell
+```console
  docker rm $(docker stop broker)
 
 ```
 
 * Remove all containers
 
-```shell
+```console
  docker rm $(docker stop $(docker ps -aq))
 
 ```
@@ -563,13 +695,13 @@ docker compose logs -f <container name>
 
 You can use the provided shell script to bring down the cluster and delete the temporary resources (e.g. SSL certificates)
 
-```shell
+```console
 ./stop.sh
 ```
 
 You can also use `docker compose` directly (which leave the temp files in place):
 
-```shell
+```console
  docker compose down
 ```
 
