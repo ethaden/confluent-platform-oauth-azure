@@ -207,19 +207,23 @@ services:
       KAFKA_LISTENER_NAME_TOKEN_OAUTHBEARER_SASL_LOGIN_CALLBACK_HANDLER_CLASS: io.confluent.kafka.server.plugins.auth.token.TokenBearerServerLoginCallbackHandler
       # Required for RBAC
       KAFKA_LISTENER_NAME_TOKEN_PRINCIPAL_BUILDER_CLASS: io.confluent.kafka.security.authenticator.OAuthKafkaPrincipalBuilder
-      KAFKA_LISTENER_NAME_TOKEN_SASL_OAUTHBEARER_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT}
-      KAFKA_LISTENER_NAME_TOKEN_SASL_OAUTHBEARER_EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
-      KAFKA_LISTENER_NAME_TOKEN_SASL_OAUTHBEARER_SUB_CLAIM_NAME: ${SUB_CLAIM_NAME}
-      KAFKA_LISTENER_NAME_TOKEN_OAUTHBEARER_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
+      #KAFKA_LISTENER_NAME_TOKEN_SASL_OAUTHBEARER_JWKS_ENDPOINT_URL: ${IDP_JWKS_ENDPOINT}
+      #KAFKA_LISTENER_NAME_TOKEN_SASL_OAUTHBEARER_EXPECTED_AUDIENCE: ${EXPECTED_AUDIENCE}
+      #KAFKA_LISTENER_NAME_TOKEN_SASL_OAUTHBEARER_SUB_CLAIM_NAME: ${SUB_CLAIM_NAME}
+      #KAFKA_LISTENER_NAME_TOKEN_OAUTHBEARER_GROUPS_CLAIM_NAME: ${GROUP_CLAIM_NAME}
       # Note: the 'unsecuredLoginStringClaim_sub="thePrincipalName"' is currently required for listeners when using RBAC in Confluent Platform for handling MDS-issued tokens.
       # It might be removed in future versions.
       # Explanation: The following JAAS configuration is used for the listener that accepts OAUTHBEARER tokens for internal Kafka broker communication as well as for those internal clients which connects to the internal broker listener.
       # Therefore we need to specify clientId and clientSecret of the Confluent Platform Application Registration here, to allow those internal clients to successfully authenticate to EntraID.
+      #KAFKA_LISTENER_NAME_TOKEN_OAUTHBEARER_SASL_JAAS_CONFIG: |
+      #  org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+      #  unsecuredLoginStringClaim_sub="thePrincipalName" \
+      #  publicKeyPath="/keys/public.pem" \
+      #  scope="${AZURE_OAUTH_SCOPE}";
       KAFKA_LISTENER_NAME_TOKEN_OAUTHBEARER_SASL_JAAS_CONFIG: |
         org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
         unsecuredLoginStringClaim_sub="thePrincipalName" \
-        publicKeyPath="/keys/public.pem" \
-        scope="${AZURE_OAUTH_SCOPE}";
+        publicKeyPath="/keys/public.pem";
 
       # Configure the listener named "LDAPLISTENER" for LDAP authentication
       KAFKA_LISTENER_NAME_LDAPLISTENER_SASL_ENABLED_MECHANISMS: PLAIN

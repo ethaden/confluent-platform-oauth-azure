@@ -303,6 +303,14 @@ docker compose exec schema-registry kafka-avro-console-consumer \
 
 All the endpoints are accessible using OAuth token.
 
+For simplicity, set (or update) all required variables by running (in your shell):
+
+```consolse
+source helper/set_user_tokens.sh
+```
+
+If you would like to get an access token manually, this is what you'd need to run (the script does this for you already):
+
 ```console
 export CLIENT_APP_ACCESS_TOKEN=$(curl -s \
       -d "client_id=$CLIENT_APP_ID" \
@@ -319,33 +327,34 @@ curl -H "Authorization: Bearer $CLIENT_APP_ACCESS_TOKEN" http://localhost:8083/c
 
 === Connector example using OAuth
 
-1. Create datagen source Connector :
+1. Create datagen source Connector (make sure you have sourced the `set_user_tokens.sh`first):
 
 ```console
-    curl --location 'localhost:8083/connectors' \
+curl --location 'broker1:8083/connectors' \
     --header 'Content-Type: application/json' \
-      --header "Authorization: Bearer $CLIENT_APP_ACCESS_TOKEN" \
-    --data '{
-    "name": "datagen-source-connector",
-    "config": {
-        "connector.class": "io.confluent.kafka.connect.datagen.DatagenConnector",
-        "tasks.max": "10",
-        "kafka.topic": "test-topic-datagen",
-        "quickstart": "users",
-        "producer.override.sasl.oauthbearer.token.endpoint.url": "http://keycloak:8080/realms/cp/protocol/openid-connect/token",
-        "producer.override.sasl.jaas.config": "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required clientId=\"connect_client_app\" clientSecret=\"connect_client_app_secret\";"
-      }
-    }'
+        --header "Authorization: Bearer $CLIENT_APP_ACCESS_TOKEN" \
+    --data "{
+    \"name\": \"datagen-source-connector\",
+    \"config\": {
+        \"connector.class\": \"io.confluent.kafka.connect.datagen.DatagenConnector\",
+        \"tasks.max\": \"10\",
+        \"kafka.topic\": \"test-topic-datagen\",
+        \"quickstart\": \"users\",
+        \"producer.override.sasl.oauthbearer.token.endpoint.url\": \"$IDP_TOKEN_ENDPOINT\",
+        \"producer.override.sasl.jaas.config\": \"org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required clientId=\\\"$CLIENT_APP_ID\\\" clientSecret=\\\"$CLIENT_APP_SECRET\\\" scope=\\\"$AZURE_OAUTH_SCOPE\\\";\"
+        }
+}"
 ```
 
-2. Login to Confluent Control Center to validate messages being produced to topic `test-topic-datagen`, use credentials `c3superuser` and `c3superuser` to login to C3 using SSO.
-3. Alternatively, you can start a consumer in the broker container to see the messages getting produced
+Obviously, using "$CLIENT_APP_ID" here is not recommended for production as it has superuser access. This is just for demo purposes.
+
+Login to Confluent Control Center to validate messages being produced to topic `test-topic-datagen`.
+
+Alternatively, you can start a consumer in the broker container to see the messages getting produced:
+
 ```console
-docker exec -it broker1 /bin/bash
-```
-```console
-kafka-console-consumer \
---bootstrap-server broker:9092 \
+docker compose exec broker1 kafka-console-consumer \
+--bootstrap-server broker1:9092 \
 --topic test-topic-datagen \
 --consumer.config /etc/confluent/configs/client.properties
 ```
@@ -397,7 +406,7 @@ The output should include the `KsqlServerInfo` object, which should include the 
 
 ==== Execute ksqlDB commands
 
-1. Creating a stream
+Creating a stream:
 
 ```console
 curl --http1.1 \
@@ -413,7 +422,7 @@ curl --http1.1 \
 
 The JSON output should include the `ABC` stream
 
-2. Executing `LIST STREAMS;`
+Executing `LIST STREAMS;`
 
 ```console
 curl --http1.1 \
@@ -426,9 +435,10 @@ curl --http1.1 \
   "streamsProperties": {}
 }' | jq
 ```
+
 The JSON output should list all the streams, the `KSQL_PROCESSING_LOG` and `ABC` streams in this case.
 
-3. Executing a Query
+Executing a Query
 
 ```console
 curl --http1.1 \
@@ -445,7 +455,7 @@ curl --http1.1 \
 The JSON output should include the message `Query Completed`.
 
 === SSO login in C3
-You can use any user defined in the IDP to do interactive login to Confluent Control Center.
+You can use any user defined in the IDP to do interactive login to Confluent Control Center: http://localhost:9021
 
 === SSO login in CLI 
 
@@ -456,7 +466,7 @@ You can use any user defined in IDP to do interactive login to Confluent Control
 You can login by specifying your MDS URL for CP cluster (if asked for a code just use the `user_code` which is already part of the URL).
 
 ```console
-confluent login --url http://localhost:8090/
+confluent login --url http://localhost:8090
 ```
 Note, that we aren't using the suffix `/kafka` here (see below), as the login endpoint is part of the MDS service, not the Kafka REST Proxy.
 
@@ -487,8 +497,6 @@ Create a new topic:
 confluent kafka topic create mytest --url $CONFLUENT_REST_URL/kafka
 ```
 
-
-
 Optionally, you can get the access token issued by the `confluent` CLI:
 
 ```console
@@ -501,7 +509,18 @@ This token can be used to access the REST API of Confluent Platform services, fo
 curl 'http://broker1:8090/kafka/v3/clusters' --header 'Content-Type: application/json' --header "Authorization: Bearer $TOKEN"
 ```
 
+This token also works for kSQLdb (for simplicity, we run this in the ksqdb-server container where the `ksql` binary is installed already):
 
+```console
+docker compose exec -ti ksqldb-server ksql http://ksqldb-server:8088 --token $TOKEN
+```
+
+Show the topics:
+
+```console
+show topics;
+exit;
+```
 
 ==== Firefox: Special settings for testing SSO via SOCKS proxy
 
@@ -518,45 +537,6 @@ Grafana can be accessed via http://localhost:3000 using the `admin:admin` creden
 From menu select "Authentication Dashboard"
 JMX exporter configs are present [here](./metrics/exporter.yml), which can tweaked as per your liking.
 
-=== Logging into Confluent Platform using the CLI
-
-If you are on the same machine and are able to use a browser, you can run:
-
-```console
-confluent login --url http://localhost:8090
-```
-
-Otherwise, you can use
-
-```console
-confluent login --url http://localhost:8090 --no-browser
-```
-
-Follow the instructions to complete the login. Note: The token expires rather quickly. You might need to reauthenticate from time to time.
-
-For simplicity, use a variable holding the kafka endpoint.
-
-```console
-export CONFLUENT_REST_URL=http://broker1:8090/kafka
-```
-
-Optionally: Get a token for authenticating to Confluent Platform: 
-
-```confole
-export TOKEN=$(confluent iam user describe -o json | jq -r '.authentication_token')
-```
-
-Access services with the token, i.e. kSQLdb (for simplicity, we run this in the ksqdb-server container where the `ksql` binary is installed already):
-
-```console
-docker compose exec -ti ksqldb-server ksql http://ksqldb-server:8088 --token $TOKEN
-```
-
-Show the topics:
-
-```console
-show topics;
-```
 
 === OpenLDAP
 
@@ -568,17 +548,17 @@ The directory is pre-populated with some users and groups:
 * User: client2, password: client2
 * User client3, password client3
 
-Querying the directory can be done on the command line like this:
+Querying the directory can also be done on the command line like this:
 
 ```console
-ldapsearch -H ldap://localhost:389 -D cn=admin,dc=demo,dc=confluent,dc=io -b dc=demo,dc=confluent,dc=io -x -w admin
+ldapsearch -H ldap://localhost:1389 -D cn=admin,dc=demo,dc=confluent,dc=io -b dc=demo,dc=confluent,dc=io -x -w admin
 ```
 
 For easier management, `phpldapamin` is made available, too. Just point your browser to this address: http://localhost:8090.
-Credentials
+Note, due to the current setup, just these two users have access:
 
-* Login DN: cn=admin,dc=demo,dc=confluent,dc=io
-* Password: admin
+* Login DN: cn=admin,dc=demo,dc=confluent,dc=io, password: admin
+* Login DN: cn=readonly,dc=confluent,dc=io, password: readonly
 
 ==== Producing and consuming using LDAP authentication
 
@@ -617,24 +597,36 @@ curl -u client:client --silent -X GET http://localhost:8090/kafka/v3/clusters/$C
 
 ==== LDAP with Schema Registry
 
-Produce some data in AVRO format:
+You can test access with curl. For example, you can query the existing subjects for the prefix `test*` like this:
+
+```console
+curl -u client:client --silent -X GET http://localhost:8081/subjects
+```
+
+
+
+Produce some data in AVRO format (note that the `kafka-avro-console-` commands do not use the `basic.auth.` values in the config file, so we need to pass them explicitly):
 
 ```console
 kafka-avro-console-producer \
-  --bootstrap-server broker1:9095 \
-  --producer.config mount/client-ldap.properties \
-  --topic test-avro \
-  --property value.schema='{"type":"record","name":"Transaction","fields":[{"name":"id","type":"string"},{"name": "amount", "type": "double"}]}'
+    --bootstrap-server broker1:9095 \
+    --producer.config mount/client-ldap.properties \
+    --topic test-avro \
+    --property basic.auth.credentials.source=USER_INFO \
+    --property basic.auth.user.info=client:client \
+    --property value.schema='{"type":"record","name":"Transaction","fields":[{"name":"id","type":"string"},{"name": "amount", "type": "double"}]}'
 ```
 
 If you do not have the `kafka-avro-console-producer` locally, you can also run it from the `schema-registry` container (but expect to see lots of logs in the output):
 
 ```console
 docker compose exec schema-registry kafka-avro-console-producer \
-  --bootstrap-server broker1:9095 \
-  --producer.config mount/client-ldap.properties \
-  --topic test-avro \
-  --property value.schema='{"type":"record","name":"Transaction","fields":[{"name":"id","type":"string"},{"name": "amount", "type": "double"}]}'
+    --bootstrap-server broker1:9095 \
+    --producer.config mount/client-ldap.properties \
+    --topic test-avro \
+    --property basic.auth.credentials.source=USER_INFO \
+    --property basic.auth.user.info=client:client \
+    --property value.schema='{"type":"record","name":"Transaction","fields":[{"name":"id","type":"string"},{"name": "amount", "type": "double"}]}'
 ```
 
 You can use these JSON strings as input:
@@ -652,6 +644,8 @@ kafka-avro-console-consumer \
     --topic test-avro \
     --from-beginning \
     --property print.key=true \
+    --property basic.auth.credentials.source=USER_INFO \
+    --property basic.auth.user.info=client:client \
     --consumer.config mount/client-ldap.properties
 ```
 
@@ -663,6 +657,8 @@ docker compose exec schema-registry kafka-avro-console-consumer \
     --topic test-avro \
     --from-beginning \
     --property print.key=true \
+    --property basic.auth.credentials.source=USER_INFO \
+    --property basic.auth.user.info=client:client \
     --consumer.config /etc/confluent/configs/client-ldap.properties
 ```
 
