@@ -6,7 +6,8 @@ services:
 
   init_certificates:
     <<: *common-security
-    image: ${DOCKER_REGISTRY}confluentinc/cp-server:${CONFLUENT_DOCKER_TAG:-latest}
+    build:
+      context: ./docker/alpine-openssl-keytool
     container_name: init_certificates
     volumes:
       - ./helper/init_certificates.sh:/usr/bin/init_certificates.sh
@@ -358,7 +359,7 @@ services:
     container_name: connect
     hostname: connect
     build:
-      context: .
+      context: ./docker/kafka-connect-connectors
       args:
         CONFLUENT_DOCKER_TAG: ${CONFLUENT_DOCKER_TAG}
 #    restart: always
@@ -643,7 +644,7 @@ services:
 
   control-center:
     <<: *common-security
-    image: ${DOCKER_REGISTRY}confluentinc/cp-enterprise-control-center-next-gen:2.2.0
+    image: ${DOCKER_REGISTRY}confluentinc/cp-enterprise-control-center-next-gen:2.4.0
     hostname: control-center
     container_name: control-center
     healthcheck:
